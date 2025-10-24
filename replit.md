@@ -4,6 +4,17 @@
 
 AI Performance Mirror is an enterprise employee performance analytics application that integrates with Zoho Projects and Zoho Sprints to provide real-time performance tracking and insights. The application serves three distinct user roles: HR Administrators (organization-wide visibility), Managers (team oversight), and Employees (personal performance views). The system computes AI-driven performance scores based on task completion, timeliness, collaboration, feedback, and other metrics, presenting them through data-rich dashboards with 3D visualizations.
 
+## Recent Changes
+
+**October 24, 2025**
+- ✅ Completed Task 6: Automated Email Reporting System
+  - Implemented email service with SMTP integration and retry logic
+  - Added database schema for report subscriptions and delivery logs
+  - Built HTML email template generator for daily and weekly performance reports
+  - Integrated configurable email schedulers with dynamic cron expressions
+  - Created HR Admin-only Email Reports UI in Settings page with subscription management, test emails, schedule configuration, and delivery history
+  - All email report features restricted to HR_ADMIN role with proper query gating and API authorization
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -129,6 +140,14 @@ The application implements a production-grade scoring engine (`server/scoringEng
   - Concurrency protection (prevents overlapping runs)
   - Reentrancy guards and race condition prevention
   - Comprehensive error handling and sync logging
+- **Email Reporting System**: Automated performance report delivery (HR Admin only)
+  - `server/emailService.ts`: Nodemailer-based SMTP email service with retry logic
+  - `server/reportGenerator.ts`: HTML email template generator for daily/weekly reports
+  - Database tables: `report_subscriptions`, `report_delivery_log`
+  - Configurable schedules (default: daily 8:00 AM, weekly Monday 8:00 AM)
+  - HR admin UI in Settings page: subscription toggles, test email, schedule config, delivery history
+  - Dynamic cron expressions built from database settings
+  - Production requires SMTP environment variables: SMTP_HOST, SMTP_USER, SMTP_PASSWORD
 - **Webhook Support**: Pending implementation for real-time Zoho updates
 
 **Key Libraries**

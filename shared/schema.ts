@@ -334,6 +334,37 @@ export const sprintItems = pgTable("sprint_items", {
 export type SprintItem = typeof sprintItems.$inferSelect;
 export type InsertSprintItem = typeof sprintItems.$inferInsert;
 
+// Report subscriptions table
+export const reportSubscriptions = pgTable("report_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  reportType: varchar("report_type").notNull(), // 'daily' or 'weekly'
+  frequency: varchar("frequency").notNull(), // 'daily' or 'weekly'
+  enabled: integer("enabled").notNull().default(1), // 1 = enabled, 0 = disabled
+  lastSentAt: timestamp("last_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ReportSubscription = typeof reportSubscriptions.$inferSelect;
+export type InsertReportSubscription = typeof reportSubscriptions.$inferInsert;
+
+// Report delivery log table
+export const reportDeliveryLog = pgTable("report_delivery_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => reportSubscriptions.id),
+  recipientEmail: varchar("recipient_email").notNull(),
+  reportType: varchar("report_type").notNull(),
+  status: varchar("status").notNull(), // 'sent', 'failed', 'pending'
+  messageId: varchar("message_id"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ReportDelivery = typeof reportDeliveryLog.$inferSelect;
+export type InsertReportDelivery = typeof reportDeliveryLog.$inferInsert;
+
 // Relations - defined after both tables
 export const sprintsRelations = relations(sprints, ({ many }) => ({
   items: many(sprintItems),

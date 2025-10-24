@@ -19,6 +19,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
+      // Check if demo role is set in session
+      if (req.session.demoRole) {
+        const demoUserMap: Record<string, string> = {
+          'HR_ADMIN': 'demo-hr-admin',
+          'MANAGER': 'demo-manager',
+          'EMPLOYEE': 'demo-employee',
+        };
+        const demoUserId = demoUserMap[req.session.demoRole];
+        const demoUser = await storage.getUser(demoUserId);
+        return res.json(demoUser);
+      }
+
+      // Otherwise return authenticated user
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       res.json(user);
@@ -60,6 +73,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error claiming admin role:", error);
       res.status(500).json({ message: "Failed to claim admin role" });
+    }
+  });
+
+  // Demo mode endpoints - set role in session
+  app.post('/api/demo/set-role', isAuthenticated, async (req: any, res) => {
+    try {
+      const { role } = req.body;
+      
+      if (!['HR_ADMIN', 'MANAGER', 'EMPLOYEE'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role' });
+      }
+
+      // Store demo role in session
+      req.session.demoRole = role;
+      
+      // Map demo role to corresponding demo user ID
+      const demoUserMap: Record<string, string> = {
+        'HR_ADMIN': 'demo-hr-admin',
+        'MANAGER': 'demo-manager',
+        'EMPLOYEE': 'demo-employee',
+      };
+
+      const demoUserId = demoUserMap[role];
+      const demoUser = await storage.getUser(demoUserId);
+
+      if (!demoUser) {
+        return res.status(500).json({ message: 'Demo user not found' });
+      }
+
+      res.json({ success: true, role, user: demoUser });
+    } catch (error) {
+      console.error("Error setting demo role:", error);
+      res.status(500).json({ message: "Failed to set demo role" });
     }
   });
 

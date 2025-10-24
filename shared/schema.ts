@@ -250,3 +250,49 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+export const zohoConnections = pgTable("zoho_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  scope: varchar("scope").notNull(),
+  zohoOrgId: varchar("zoho_org_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const zohoConnectionsRelations = relations(zohoConnections, ({ one }) => ({
+  user: one(users, {
+    fields: [zohoConnections.userId],
+    references: [users.id],
+  }),
+}));
+
+export type ZohoConnection = typeof zohoConnections.$inferSelect;
+export type InsertZohoConnection = typeof zohoConnections.$inferInsert;
+
+export const syncSettings = pgTable("sync_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key").notNull().unique(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SyncSetting = typeof syncSettings.$inferSelect;
+export type InsertSyncSetting = typeof syncSettings.$inferInsert;
+
+export const syncLogs = pgTable("sync_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  syncType: varchar("sync_type").notNull(),
+  status: varchar("status").notNull(),
+  itemsProcessed: integer("items_processed").default(0),
+  errors: jsonb("errors"),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type SyncLog = typeof syncLogs.$inferSelect;
+export type InsertSyncLog = typeof syncLogs.$inferInsert;

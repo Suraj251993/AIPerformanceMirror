@@ -7,10 +7,14 @@ import { seedMockData } from "./mockData";
 import { db } from "./db";
 import { users, feedback as feedbackTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { registerZohoRoutes } from "./zohoRoutes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Register Zoho integration routes
+  registerZohoRoutes(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -296,3 +300,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
+

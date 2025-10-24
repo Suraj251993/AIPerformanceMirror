@@ -1,0 +1,193 @@
+import type { Express } from "express";
+import { zohoAuthService } from "./zohoAuth.js";
+import { isAuthenticated } from "./replitAuth.js";
+import { createZohoApiClient } from "./zohoApi.js";
+import { storage } from "./storage.js";
+import crypto from "crypto";
+
+const pendingAuths = new Map<string, { userId: string; timestamp: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [state, data] of pendingAuths.entries()) {
+    if (now - data.timestamp > 600000) {
+      pendingAuths.delete(state);
+    }
+  }
+}, 60000);
+
+export function registerZohoRoutes(app: Express) {
+  app.get('/api/zoho/auth-url', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can connect Zoho' });
+      }
+
+      const state = crypto.randomBytes(32).toString('hex');
+      pendingAuths.set(state, { userId, timestamp: Date.now() });
+
+      const authUrl = zohoAuthService.getAuthorizationUrl(state);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error('Error generating Zoho auth URL:', error);
+      res.status(500).json({ message: 'Failed to generate auth URL' });
+    }
+  });
+
+  app.get('/api/zoho/callback', async (req, res) => {
+    try {
+      const { code, state } = req.query;
+
+      if (!code || !state) {
+        return res.status(400).send('Missing code or state');
+      }
+
+      const authData = pendingAuths.get(state as string);
+      if (!authData) {
+        return res.status(400).send('Invalid or expired state');
+      }
+
+      pendingAuths.delete(state as string);
+
+      const tokenResponse = await zohoAuthService.exchangeCodeForTokens(code as string);
+      
+      await zohoAuthService.saveConnection(authData.userId, tokenResponse);
+
+      res.send(`
+        <html>
+          <body>
+            <h1>Zoho Connected Successfully!</h1>
+            <p>You can close this window and return to the application.</p>
+            <script>
+              setTimeout(() => window.close(), 2000);
+            </script>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      console.error('Error in Zoho callback:', error);
+      res.status(500).send('Failed to complete Zoho authorization');
+    }
+  });
+
+  app.get('/api/zoho/connection-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const hasConnection = await zohoAuthService.hasValidConnection(userId);
+      res.json({ connected: hasConnection });
+    } catch (error: any) {
+      console.error('Error checking Zoho connection:', error);
+      res.status(500).json({ message: 'Failed to check connection status' });
+    }
+  });
+
+  app.delete('/api/zoho/connection', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can disconnect Zoho' });
+      }
+
+      await zohoAuthService.deleteConnection(userId);
+      res.json({ message: 'Zoho connection removed successfully' });
+    } catch (error: any) {
+      console.error('Error removing Zoho connection:', error);
+      res.status(500).json({ message: 'Failed to remove connection' });
+    }
+  });
+
+  app.get('/api/zoho/portals', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const zohoClient = createZohoApiClient(userId);
+      const portals = await zohoClient.getPortals();
+      res.json(portals);
+    } catch (error: any) {
+      console.error('Error fetching Zoho portals:', error);
+      res.status(500).json({ message: 'Failed to fetch portals' });
+    }
+  });
+
+  app.post('/api/zoho/sync/projects', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can trigger sync' });
+      }
+
+      const { portalId } = req.body;
+      if (!portalId) {
+        return res.status(400).json({ message: 'Portal ID required' });
+      }
+
+      const zohoClient = createZohoApiClient(userId);
+      const projects = await zohoClient.getProjects(portalId);
+
+      let synced = 0;
+      for (const project of projects) {
+        await storage.upsertProject({
+          id: project.id,
+          name: project.name,
+          description: project.description || '',
+          status: project.status.toLowerCase(),
+        });
+        synced++;
+      }
+
+      res.json({ message: `Synced ${synced} projects successfully` });
+    } catch (error: any) {
+      console.error('Error syncing projects:', error);
+      res.status(500).json({ message: 'Failed to sync projects' });
+    }
+  });
+
+  app.post('/api/zoho/sync/tasks', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can trigger sync' });
+      }
+
+      const { portalId, projectId } = req.body;
+      if (!portalId || !projectId) {
+        return res.status(400).json({ message: 'Portal ID and Project ID required' });
+      }
+
+      const zohoClient = createZohoApiClient(userId);
+      const tasks = await zohoClient.getTasks(portalId, projectId);
+
+      let synced = 0;
+      for (const task of tasks) {
+        const ownerId = task.details.owners[0]?.id;
+        if (!ownerId) continue;
+
+        await storage.upsertTask({
+          id: task.id,
+          projectId: task.project.id,
+          title: task.name,
+          description: task.description || '',
+          assigneeId: ownerId,
+          status: task.details.status.type.toLowerCase(),
+          priority: task.details.priority?.toLowerCase() || 'medium',
+          dueDate: task.details.end_date ? new Date(task.details.end_date) : undefined,
+          completedAt: task.details.completed_date ? new Date(task.details.completed_date) : undefined,
+        });
+        synced++;
+      }
+
+      res.json({ message: `Synced ${synced} tasks successfully` });
+    } catch (error: any) {
+      console.error('Error syncing tasks:', error);
+      res.status(500).json({ message: 'Failed to sync tasks' });
+    }
+  });
+}

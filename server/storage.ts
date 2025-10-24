@@ -33,10 +33,12 @@ export interface IStorage {
   // Project operations
   getAllProjects(): Promise<Project[]>;
   getProject(id: string): Promise<Project | undefined>;
+  upsertProject(project: { id: string; name: string; description: string; status: string }): Promise<Project>;
   
   // Task operations
   getTasksByAssignee(assigneeId: string): Promise<Task[]>;
   getTasksByProject(projectId: string): Promise<Task[]>;
+  upsertTask(task: { id: string; projectId: string; title: string; description: string; assigneeId: string; status: string; priority: string; dueDate?: Date; completedAt?: Date }): Promise<Task>;
   
   // Time log operations
   getTimeLogsByUser(userId: string): Promise<TimeLog[]>;
@@ -97,6 +99,21 @@ export class DatabaseStorage implements IStorage {
     return project;
   }
 
+  async upsertProject(projectData: { id: string; name: string; description: string; status: string }): Promise<Project> {
+    const [project] = await db
+      .insert(projects)
+      .values(projectData)
+      .onConflictDoUpdate({
+        target: projects.id,
+        set: {
+          ...projectData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return project;
+  }
+
   // Task operations
   async getTasksByAssignee(assigneeId: string): Promise<Task[]> {
     return await db.select().from(tasks).where(eq(tasks.assigneeId, assigneeId)).orderBy(desc(tasks.createdAt));
@@ -104,6 +121,21 @@ export class DatabaseStorage implements IStorage {
 
   async getTasksByProject(projectId: string): Promise<Task[]> {
     return await db.select().from(tasks).where(eq(tasks.projectId, projectId));
+  }
+
+  async upsertTask(taskData: { id: string; projectId: string; title: string; description: string; assigneeId: string; status: string; priority: string; dueDate?: Date; completedAt?: Date }): Promise<Task> {
+    const [task] = await db
+      .insert(tasks)
+      .values(taskData)
+      .onConflictDoUpdate({
+        target: tasks.id,
+        set: {
+          ...taskData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return task;
   }
 
   // Time log operations

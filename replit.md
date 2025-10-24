@@ -87,6 +87,9 @@ Scores are computed and stored in the `scores` table with breakdown components s
 - `feedback`: Peer and manager feedback with ratings and categories
 - `scores`: Computed performance scores with timestamp and component breakdown
 - `audit_logs`: System audit trail for compliance
+- `zoho_connections`: OAuth2 tokens for Zoho integration (userId, accessToken, refreshToken, expiresAt, scope, zohoOrgId)
+- `sync_settings`: Configuration for data sync (scoring weights, polling intervals, retention policies)
+- `sync_logs`: History of sync operations with status and error tracking
 
 **Schema Relationships**
 - Self-referential manager-employee hierarchy in users table
@@ -101,11 +104,12 @@ Scores are computed and stored in the `scores` table with breakdown components s
 - WebSocket support for serverless connections
 - Connection pooling for production environments
 
-**Third-Party Integrations (Planned)**
-- Zoho Projects API: Task and project data ingestion
-- Zoho Sprints API: Sprint and story point tracking
-- OAuth2 flow for Zoho service authentication
-- Webhook support for real-time updates when available
+**Third-Party Integrations**
+- Zoho Projects API: Task and project data ingestion (OAuth2 implemented)
+- Zoho Sprints API: Sprint and story point tracking (OAuth2 implemented)
+- OAuth2 flow for Zoho service authentication (Completed)
+- Webhook support for real-time updates (Pending)
+- Real-time data sync with polling scheduler (In Progress)
 
 **Key Libraries**
 - `@tanstack/react-query`: Server state management and caching

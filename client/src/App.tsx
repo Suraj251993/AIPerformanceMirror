@@ -9,6 +9,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
+import SettingsPage from "@/pages/settings";
 import Landing from "@/pages/landing";
 import HRDashboard from "@/pages/hr-dashboard";
 import ManagerDashboard from "@/pages/manager-dashboard";
@@ -54,7 +55,10 @@ function Router() {
           <main className="flex-1 overflow-y-auto">
             <Switch>
               {user?.role === 'HR_ADMIN' && (
-                <Route path="/" component={HRDashboard} />
+                <>
+                  <Route path="/" component={HRDashboard} />
+                  <Route path="/settings" component={SettingsPage} />
+                </>
               )}
               {user?.role === 'MANAGER' && (
                 <Route path="/" component={ManagerDashboard} />

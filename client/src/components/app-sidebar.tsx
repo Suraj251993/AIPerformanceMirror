@@ -23,6 +23,7 @@ export function AppSidebar() {
 
   const hrItems = [
     { title: "Dashboard", url: "/", icon: Home },
+    { title: "Settings", url: "/settings", icon: Settings },
   ];
 
   const managerItems = [

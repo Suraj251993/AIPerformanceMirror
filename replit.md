@@ -65,15 +65,20 @@ Preferred communication style: Simple, everyday language.
 - Migrations managed through Drizzle Kit
 
 **Performance Scoring System**
-The application implements a multi-component scoring algorithm that evaluates:
-- Task completion rates
-- Timeliness (meeting deadlines)
-- Efficiency (time spent vs. estimated)
-- Sprint velocity (story points completed)
-- Collaboration metrics (code reviews, comments, interactions)
-- Peer feedback ratings
+The application implements a production-grade scoring engine (`server/scoringEngine.ts`) with real data integration:
+- **Task Completion**: Percentage of tasks completed by the user
+- **Timeliness**: On-time completion rate (completed before due date)
+- **Efficiency**: Time logged vs. estimated hours ratio
+- **Sprint Velocity**: Real story points completed from Zoho Sprints data (replaces mock calculations)
+- **Collaboration**: Activity-based metrics (time logs, interactions)
+- **Feedback**: Peer and manager feedback ratings averaged
 
-Scores are computed and stored in the `scores` table with breakdown components stored as JSONB for flexibility.
+**Scoring Engine Features:**
+- Uses configurable weights from `sync_settings` (default: taskCompletion 30%, timeliness 20%, efficiency 10%, velocity 15%, collaboration 5%, feedback 20%)
+- `calculateVelocityScore()`: Queries actual sprint data, sums story points completed, calculates average velocity across completed sprints
+- `calculateUserScore()`: Orchestrates all components, applies weights, returns 0-100 score with detailed breakdown
+- `generateAllScores()`: Batch processing for all employees with automatic daily score persistence
+- Scores stored in `scores` table with JSONB component breakdown for flexibility and historical tracking
 
 ### Database Schema
 
@@ -90,12 +95,16 @@ Scores are computed and stored in the `scores` table with breakdown components s
 - `zoho_connections`: OAuth2 tokens for Zoho integration (userId, accessToken, refreshToken, expiresAt, scope, zohoOrgId)
 - `sync_settings`: Configuration for data sync (scoring weights, polling intervals, retention policies)
 - `sync_logs`: History of sync operations with status and error tracking
+- `sprints`: Sprint metadata from Zoho Sprints (name, startDate, endDate, status, teamId, goals)
+- `sprint_items`: Sprint backlog items with story points, status, assignee, sprint association
 
 **Schema Relationships**
 - Self-referential manager-employee hierarchy in users table
 - One-to-many: users → tasks, users → time_logs, users → activity_events
 - One-to-many: projects → tasks
+- One-to-many: sprints → sprint_items
 - Many-to-many feedback through from_user_id and to_user_id relationships
+- Sprint items linked to users via assigneeId for velocity tracking
 
 ### External Dependencies
 
@@ -105,11 +114,22 @@ Scores are computed and stored in the `scores` table with breakdown components s
 - Connection pooling for production environments
 
 **Third-Party Integrations**
-- Zoho Projects API: Task and project data ingestion (OAuth2 implemented)
-- Zoho Sprints API: Sprint and story point tracking (OAuth2 implemented)
-- OAuth2 flow for Zoho service authentication (Completed)
-- Webhook support for real-time updates (Pending)
-- Real-time data sync with polling scheduler (In Progress)
+- **Zoho Projects API**: Task and project data ingestion (OAuth2 implemented, production-ready)
+  - API client methods: getProjects(), getTasklists(), getTasks(), getUsers()
+  - Sync service with pagination, rate limiting, error handling
+  - Automated syncing via scheduler
+- **Zoho Sprints API**: Sprint velocity and story point tracking (OAuth2 implemented, production-ready)
+  - API client methods: getSprints(), getSprintItems(), getBacklogItems(), getTeams()
+  - Full sprint metadata and backlog item sync
+  - Real velocity calculations in scoring engine using actual story points completed
+  - Integrated into automated sync pipeline
+- **OAuth2 Flow**: Complete Zoho service authentication with token refresh and secure storage
+- **Sync Scheduler**: Production-ready polling system (`server/scheduler.ts`)
+  - Configurable intervals (default: 60 minutes)
+  - Concurrency protection (prevents overlapping runs)
+  - Reentrancy guards and race condition prevention
+  - Comprehensive error handling and sync logging
+- **Webhook Support**: Pending implementation for real-time Zoho updates
 
 **Key Libraries**
 - `@tanstack/react-query`: Server state management and caching

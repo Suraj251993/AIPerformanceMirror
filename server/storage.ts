@@ -7,6 +7,8 @@ import {
   feedback,
   scores,
   auditLogs,
+  sprints,
+  sprintItems,
   type User,
   type UpsertUser,
   type Project,
@@ -17,6 +19,8 @@ import {
   type InsertFeedback,
   type Score,
   type AuditLog,
+  type Sprint,
+  type SprintItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -57,6 +61,17 @@ export interface IStorage {
   
   // Audit log operations
   createAuditLog(log: { userId: string; action: string; target: string; details?: any }): Promise<AuditLog>;
+  
+  // Sprint operations
+  getAllSprints(): Promise<Sprint[]>;
+  getSprint(id: string): Promise<Sprint | undefined>;
+  getSprintsByTeam(teamId: string): Promise<Sprint[]>;
+  upsertSprint(sprint: { id: string; teamId: string; name: string; startDate: Date; endDate: Date; status: string; totalStoryPoints: number; completedStoryPoints: number; velocityTarget?: number }): Promise<Sprint>;
+  
+  // Sprint item operations
+  getSprintItemsBySprint(sprintId: string): Promise<SprintItem[]>;
+  getSprintItemsByAssignee(assigneeId: string): Promise<SprintItem[]>;
+  upsertSprintItem(item: { id: string; sprintId?: string; projectId?: string; title: string; description: string; itemType: string; status: string; priority: string; storyPoints?: number; assigneeId?: string }): Promise<SprintItem>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -194,6 +209,59 @@ export class DatabaseStorage implements IStorage {
   async createAuditLog(logData: { userId: string; action: string; target: string; details?: any }): Promise<AuditLog> {
     const [log] = await db.insert(auditLogs).values(logData).returning();
     return log;
+  }
+
+  // Sprint operations
+  async getAllSprints(): Promise<Sprint[]> {
+    return await db.select().from(sprints);
+  }
+
+  async getSprint(id: string): Promise<Sprint | undefined> {
+    const [sprint] = await db.select().from(sprints).where(eq(sprints.id, id));
+    return sprint;
+  }
+
+  async getSprintsByTeam(teamId: string): Promise<Sprint[]> {
+    return await db.select().from(sprints).where(eq(sprints.teamId, teamId)).orderBy(desc(sprints.startDate));
+  }
+
+  async upsertSprint(sprintData: { id: string; teamId: string; name: string; startDate: Date; endDate: Date; status: string; totalStoryPoints: number; completedStoryPoints: number; velocityTarget?: number }): Promise<Sprint> {
+    const [sprint] = await db
+      .insert(sprints)
+      .values(sprintData)
+      .onConflictDoUpdate({
+        target: sprints.id,
+        set: {
+          ...sprintData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return sprint;
+  }
+
+  // Sprint item operations
+  async getSprintItemsBySprint(sprintId: string): Promise<SprintItem[]> {
+    return await db.select().from(sprintItems).where(eq(sprintItems.sprintId, sprintId));
+  }
+
+  async getSprintItemsByAssignee(assigneeId: string): Promise<SprintItem[]> {
+    return await db.select().from(sprintItems).where(eq(sprintItems.assigneeId, assigneeId)).orderBy(desc(sprintItems.createdAt));
+  }
+
+  async upsertSprintItem(itemData: { id: string; sprintId?: string; projectId?: string; title: string; description: string; itemType: string; status: string; priority: string; storyPoints?: number; assigneeId?: string }): Promise<SprintItem> {
+    const [item] = await db
+      .insert(sprintItems)
+      .values(itemData)
+      .onConflictDoUpdate({
+        target: sprintItems.id,
+        set: {
+          ...itemData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return item;
   }
 }
 

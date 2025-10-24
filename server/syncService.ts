@@ -180,7 +180,163 @@ export class SyncService {
     }
   }
 
-  async syncAll(): Promise<{ projects: SyncResult; tasks: SyncResult[] }> {
+  async syncSprints(teamId: string): Promise<SyncResult> {
+    const startTime = Date.now();
+    const errors: Array<{ message: string; details?: any }> = [];
+    let itemsProcessed = 0;
+
+    const [logEntry] = await db
+      .insert(syncLogs)
+      .values({
+        syncType: 'sprints',
+        status: 'running',
+        itemsProcessed: 0,
+      })
+      .returning();
+
+    try {
+      const zohoClient = createZohoApiClient(this.userId);
+      const sprints = await zohoClient.getSprints(teamId);
+
+      for (const sprint of sprints) {
+        try {
+          await storage.upsertSprint({
+            id: sprint.id,
+            teamId,
+            name: sprint.name,
+            startDate: new Date(sprint.start_date),
+            endDate: new Date(sprint.end_date),
+            status: sprint.status.toLowerCase(),
+            totalStoryPoints: sprint.total_story_points || 0,
+            completedStoryPoints: sprint.completed_story_points || 0,
+          });
+          itemsProcessed++;
+        } catch (error: any) {
+          errors.push({
+            message: `Failed to sync sprint ${sprint.id}`,
+            details: error.message,
+          });
+        }
+      }
+
+      await db
+        .update(syncLogs)
+        .set({
+          status: errors.length > 0 ? 'partial_success' : 'success',
+          itemsProcessed,
+          errors: errors.length > 0 ? errors : null,
+          completedAt: new Date(),
+        })
+        .where(eq(syncLogs.id, logEntry.id));
+
+      return {
+        success: errors.length === 0,
+        itemsProcessed,
+        errors,
+        duration: Date.now() - startTime,
+      };
+    } catch (error: any) {
+      errors.push({ message: 'Failed to fetch sprints from Zoho', details: error.message });
+
+      await db
+        .update(syncLogs)
+        .set({
+          status: 'failed',
+          itemsProcessed,
+          errors,
+          completedAt: new Date(),
+        })
+        .where(eq(syncLogs.id, logEntry.id));
+
+      return {
+        success: false,
+        itemsProcessed,
+        errors,
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  async syncSprintItems(teamId: string, sprintId: string): Promise<SyncResult> {
+    const startTime = Date.now();
+    const errors: Array<{ message: string; details?: any }> = [];
+    let itemsProcessed = 0;
+
+    const [logEntry] = await db
+      .insert(syncLogs)
+      .values({
+        syncType: 'sprint_items',
+        status: 'running',
+        itemsProcessed: 0,
+      })
+      .returning();
+
+    try {
+      const zohoClient = createZohoApiClient(this.userId);
+      const items = await zohoClient.getSprintItems(teamId, sprintId);
+
+      for (const item of items) {
+        try {
+          await storage.upsertSprintItem({
+            id: item.id,
+            sprintId: item.sprint_id,
+            projectId: item.project_id,
+            title: item.title,
+            description: item.description || '',
+            itemType: item.item_type,
+            status: item.status,
+            priority: item.priority || 'medium',
+            storyPoints: item.story_points,
+            assigneeId: item.assignee?.id,
+          });
+          itemsProcessed++;
+        } catch (error: any) {
+          errors.push({
+            message: `Failed to sync sprint item ${item.id}`,
+            details: error.message,
+          });
+        }
+      }
+
+      await db
+        .update(syncLogs)
+        .set({
+          status: errors.length > 0 ? 'partial_success' : 'success',
+          itemsProcessed,
+          errors: errors.length > 0 ? errors : null,
+          completedAt: new Date(),
+        })
+        .where(eq(syncLogs.id, logEntry.id));
+
+      return {
+        success: errors.length === 0,
+        itemsProcessed,
+        errors,
+        duration: Date.now() - startTime,
+      };
+    } catch (error: any) {
+      errors.push({ message: 'Failed to fetch sprint items from Zoho', details: error.message });
+
+      await db
+        .update(syncLogs)
+        .set({
+          status: 'failed',
+          itemsProcessed,
+          errors,
+          completedAt: new Date(),
+        })
+        .where(eq(syncLogs.id, logEntry.id));
+
+      return {
+        success: false,
+        itemsProcessed,
+        errors,
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  async syncAll(): Promise<{ projects: SyncResult; tasks: SyncResult[]; sprints?: SyncResult; sprintItems?: SyncResult[] }> {
     const projectsResult = await this.syncProjects();
     
     const allProjects = await storage.getAllProjects();
@@ -191,9 +347,25 @@ export class SyncService {
       tasksResults.push(taskResult);
     }
 
+    const teamSettings = await SyncService.getSyncSettings('zoho_team_id');
+    let sprintsResult: SyncResult | undefined;
+    let sprintItemsResults: SyncResult[] = [];
+
+    if (teamSettings?.teamId) {
+      sprintsResult = await this.syncSprints(teamSettings.teamId);
+      
+      const allSprints = await storage.getAllSprints();
+      for (const sprint of allSprints) {
+        const sprintItemResult = await this.syncSprintItems(teamSettings.teamId, sprint.id);
+        sprintItemsResults.push(sprintItemResult);
+      }
+    }
+
     return {
       projects: projectsResult,
       tasks: tasksResults,
+      sprints: sprintsResult,
+      sprintItems: sprintItemsResults,
     };
   }
 

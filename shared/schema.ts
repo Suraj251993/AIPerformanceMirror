@@ -296,3 +296,60 @@ export const syncLogs = pgTable("sync_logs", {
 
 export type SyncLog = typeof syncLogs.$inferSelect;
 export type InsertSyncLog = typeof syncLogs.$inferInsert;
+
+// Sprints table - Zoho Sprints integration
+export const sprints = pgTable("sprints", {
+  id: varchar("id").primaryKey(),
+  teamId: varchar("team_id").notNull(),
+  name: varchar("name").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  status: varchar("status").notNull(), // 'planned', 'active', 'completed'
+  totalStoryPoints: integer("total_story_points").default(0),
+  completedStoryPoints: integer("completed_story_points").default(0),
+  velocityTarget: integer("velocity_target"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Sprint = typeof sprints.$inferSelect;
+export type InsertSprint = typeof sprints.$inferInsert;
+
+// Sprint items (backlog items/stories/tasks with story points)
+export const sprintItems = pgTable("sprint_items", {
+  id: varchar("id").primaryKey(),
+  sprintId: varchar("sprint_id").references(() => sprints.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  itemType: varchar("item_type").notNull(), // 'story', 'task', 'bug', 'epic'
+  status: varchar("status").notNull(), // 'new', 'in_progress', 'in_review', 'completed', 'blocked'
+  priority: varchar("priority").default('medium'),
+  storyPoints: integer("story_points"),
+  assigneeId: varchar("assignee_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SprintItem = typeof sprintItems.$inferSelect;
+export type InsertSprintItem = typeof sprintItems.$inferInsert;
+
+// Relations - defined after both tables
+export const sprintsRelations = relations(sprints, ({ many }) => ({
+  items: many(sprintItems),
+}));
+
+export const sprintItemsRelations = relations(sprintItems, ({ one }) => ({
+  sprint: one(sprints, {
+    fields: [sprintItems.sprintId],
+    references: [sprints.id],
+  }),
+  project: one(projects, {
+    fields: [sprintItems.projectId],
+    references: [projects.id],
+  }),
+  assignee: one(users, {
+    fields: [sprintItems.assigneeId],
+    references: [users.id],
+  }),
+}));

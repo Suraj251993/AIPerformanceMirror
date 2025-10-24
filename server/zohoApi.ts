@@ -49,6 +49,23 @@ export interface ZohoSprint {
   completed_story_points: number;
 }
 
+export interface ZohoSprintItem {
+  id: string;
+  sprint_id: string;
+  project_id: string;
+  title: string;
+  description: string;
+  item_type: string; // 'story', 'task', 'bug', 'epic'
+  status: string;
+  priority: string;
+  story_points: number;
+  assignee: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
 export class ZohoApiClient {
   private userId: string;
   private client: AxiosInstance;
@@ -126,6 +143,51 @@ export class ZohoApiClient {
       return response.data.sprints || [];
     } catch (error: any) {
       console.error('Error fetching sprints from Zoho:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async getSprintItems(teamId: string, sprintId: string): Promise<ZohoSprintItem[]> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await this.client.get(
+        `${ZOHO_SPRINTS_BASE_URL}/team/${teamId}/sprints/${sprintId}/items/`,
+        { headers }
+      );
+      
+      return response.data.items || [];
+    } catch (error: any) {
+      console.error('Error fetching sprint items from Zoho:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async getBacklogItems(teamId: string, projectId: string): Promise<ZohoSprintItem[]> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await this.client.get(
+        `${ZOHO_SPRINTS_BASE_URL}/team/${teamId}/projects/${projectId}/backlog/`,
+        { headers }
+      );
+      
+      return response.data.items || [];
+    } catch (error: any) {
+      console.error('Error fetching backlog items from Zoho:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async getTeams(): Promise<Array<{ id: string; name: string }>> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await this.client.get(
+        `${ZOHO_SPRINTS_BASE_URL}/teams/`,
+        { headers }
+      );
+      
+      return response.data.teams || [];
+    } catch (error: any) {
+      console.error('Error fetching teams from Zoho:', error.response?.data || error.message);
       throw error;
     }
   }

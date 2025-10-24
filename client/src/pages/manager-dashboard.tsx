@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { ScoreDetailsModal } from "@/components/score-details-modal";
 import { FeedbackDialog } from "@/components/feedback-dialog";
+import { AnimatedBackground } from "@/components/animated-background";
 import type { User, Score } from "@shared/schema";
 
 interface TeamData {
@@ -62,10 +63,27 @@ export default function ManagerDashboard() {
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Main Content */}
         <div className="flex-1 space-y-8">
-          {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Team Dashboard</h1>
-            <p className="text-muted-foreground">Manage and monitor your team's performance</p>
+          {/* Header with Animated Background */}
+          <div className="relative pb-6 -mx-8 px-8">
+            <AnimatedBackground particleCount={30} />
+            <div className="relative z-10">
+              <motion.h1 
+                className="text-3xl font-bold text-foreground"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                Team Dashboard
+              </motion.h1>
+              <motion.p 
+                className="text-muted-foreground"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+              >
+                Manage and monitor your team's performance
+              </motion.p>
+            </div>
           </div>
 
           {/* KPIs */}
@@ -170,24 +188,77 @@ export default function ManagerDashboard() {
           transition={{ duration: 0.4, delay: 0.5 }}
           className="w-full lg:w-80"
         >
-          <Card className="sticky top-4">
-            <div className="p-6 border-b border-border">
-              <h2 className="text-lg font-semibold">Alerts</h2>
+          <Card className="sticky top-4 backdrop-blur-sm bg-card/95 overflow-hidden">
+            {/* Subtle glow header */}
+            <div className="p-6 border-b border-border relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 to-transparent pointer-events-none" />
+              <h2 className="text-lg font-semibold relative z-10 flex items-center gap-2">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-2 h-2 rounded-full bg-amber-500"
+                />
+                Alerts
+              </h2>
             </div>
             <div className="p-6 space-y-3">
               {data?.alerts && data.alerts.length > 0 ? (
                 data.alerts.map((alert, i) => (
-                  <div
+                  <motion.div
                     key={i}
-                    className={`p-3 rounded-lg border ${
+                    initial={{ opacity: 0, x: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ duration: 0.3, delay: 0.6 + i * 0.1 }}
+                    whileHover={{ 
+                      y: -2,
+                      scale: 1.02,
+                      transition: { duration: 0.2 }
+                    }}
+                    className={`p-3 rounded-lg border relative overflow-hidden ${
                       alert.severity === 'warning'
                         ? 'border-amber-500/30 bg-amber-500/5'
                         : 'border-blue-500/30 bg-blue-500/5'
                     }`}
+                    style={{
+                      boxShadow: alert.severity === 'warning'
+                        ? '0 2px 8px rgba(245, 158, 11, 0.1)'
+                        : '0 2px 8px rgba(59, 130, 246, 0.1)'
+                    }}
                   >
-                    <p className="text-sm font-medium mb-1">{alert.userName}</p>
-                    <p className="text-xs text-muted-foreground">{alert.message}</p>
-                  </div>
+                    {/* Side accent bar */}
+                    <div 
+                      className={`absolute left-0 top-0 bottom-0 w-1 ${
+                        alert.severity === 'warning' ? 'bg-amber-500' : 'bg-blue-500'
+                      }`}
+                      style={{
+                        boxShadow: alert.severity === 'warning'
+                          ? '0 0 8px rgba(245, 158, 11, 0.5)'
+                          : '0 0 8px rgba(59, 130, 246, 0.5)'
+                      }}
+                    />
+                    
+                    {/* Content */}
+                    <div className="relative z-10 pl-2">
+                      <p className="text-sm font-medium mb-1">{alert.userName}</p>
+                      <p className="text-xs text-muted-foreground">{alert.message}</p>
+                    </div>
+
+                    {/* Floating particles for warning alerts */}
+                    {alert.severity === 'warning' && (
+                      <motion.div
+                        className="absolute top-1 right-1 w-1 h-1 rounded-full bg-amber-500/50"
+                        animate={{
+                          y: [0, -10, 0],
+                          opacity: [0.5, 1, 0.5],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          delay: i * 0.3,
+                        }}
+                      />
+                    )}
+                  </motion.div>
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">

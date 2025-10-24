@@ -8,7 +8,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ScoreCircle } from "@/components/score-circle";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import type { Score, ScoreComponents, User } from "@shared/schema";
 import { motion } from "framer-motion";
 
@@ -101,36 +101,125 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
 
             {/* Score History Chart */}
             {data?.history && data.history.length > 1 && (
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Performance Trend</h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={data.history.slice(-30)}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis
-                      dataKey="date"
-                      className="text-xs"
-                      tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    />
-                    <YAxis domain={[0, 100]} className="text-xs" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '0.5rem',
-                      }}
-                      labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                      formatter={(value: any) => [value.toFixed(1), 'Score']}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="scoreValue"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Card>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.3 }}
+              >
+                <Card className="p-6 relative overflow-hidden">
+                  {/* Subtle glow background */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+                  
+                  <h3 className="text-lg font-semibold mb-4 relative z-10">Performance Trend</h3>
+                  <div className="relative z-10">
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart data={data.history.slice(-30)}>
+                        <defs>
+                          {/* Gradient fill for area */}
+                          <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05}/>
+                          </linearGradient>
+                          {/* Glow filter for line */}
+                          <filter id="lineGlow">
+                            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                            <feMerge>
+                              <feMergeNode in="coloredBlur"/>
+                              <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                          </filter>
+                        </defs>
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          className="stroke-border/30" 
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="date"
+                          className="text-xs"
+                          tickLine={false}
+                          axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                          tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        />
+                        <YAxis 
+                          domain={[0, 100]} 
+                          className="text-xs"
+                          tickLine={false}
+                          axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                        />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              const score = payload[0].value as number;
+                              const getScoreColor = () => {
+                                if (score >= 90) return 'hsl(142, 72%, 60%)';
+                                if (score >= 75) return 'hsl(208, 82%, 50%)';
+                                if (score >= 60) return 'hsl(38, 90%, 65%)';
+                                return 'hsl(0, 68%, 50%)';
+                              };
+                              
+                              return (
+                                <div 
+                                  className="backdrop-blur-md bg-card/95 border border-border rounded-lg p-3 shadow-2xl"
+                                  style={{
+                                    boxShadow: `0 8px 16px -4px ${getScoreColor()}40, 0 0 0 1px ${getScoreColor()}20`,
+                                  }}
+                                >
+                                  <p className="text-xs text-muted-foreground mb-1">
+                                    {new Date(label).toLocaleDateString('en-US', { 
+                                      month: 'short', 
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </p>
+                                  <p className="text-lg font-bold" style={{ color: getScoreColor() }}>
+                                    {score.toFixed(1)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Performance Score</p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        {/* Area with gradient fill */}
+                        <Area
+                          type="monotone"
+                          dataKey="scoreValue"
+                          stroke="none"
+                          fill="url(#scoreGradient)"
+                          animationDuration={1000}
+                          animationBegin={200}
+                        />
+                        {/* Line with glow effect */}
+                        <Line
+                          type="monotone"
+                          dataKey="scoreValue"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={3}
+                          dot={{ 
+                            fill: 'hsl(var(--card))', 
+                            stroke: 'hsl(var(--primary))',
+                            strokeWidth: 3,
+                            r: 5,
+                            style: { filter: 'drop-shadow(0 0 4px hsl(var(--primary)))' }
+                          }}
+                          activeDot={{ 
+                            r: 7, 
+                            fill: 'hsl(var(--primary))',
+                            stroke: 'hsl(var(--card))',
+                            strokeWidth: 2,
+                            style: { filter: 'drop-shadow(0 0 8px hsl(var(--primary)))' }
+                          }}
+                          filter="url(#lineGlow)"
+                          animationDuration={1500}
+                          animationBegin={0}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              </motion.div>
             )}
 
             {/* Weight Configuration Info */}

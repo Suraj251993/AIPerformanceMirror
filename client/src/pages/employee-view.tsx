@@ -9,6 +9,7 @@ import { MessageSquare, TrendingUp, Target, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { ScoreDetailsModal } from "@/components/score-details-modal";
+import { AnimatedBackground } from "@/components/animated-background";
 import { formatDistanceToNow } from "date-fns";
 import type { ActivityEvent, Feedback, Score, ScoreComponents } from "@shared/schema";
 
@@ -49,10 +50,27 @@ export default function EmployeeView() {
 
   return (
     <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-foreground">My Performance</h1>
-        <p className="text-muted-foreground">Track your progress and achievements</p>
+      {/* Header with Animated Background */}
+      <div className="relative text-center pb-6 -mx-8 px-8">
+        <AnimatedBackground particleCount={40} />
+        <div className="relative z-10">
+          <motion.h1 
+            className="text-3xl font-bold text-foreground"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            My Performance
+          </motion.h1>
+          <motion.p 
+            className="text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            Track your progress and achievements
+          </motion.p>
+        </div>
       </div>
 
       {/* Score Hero */}

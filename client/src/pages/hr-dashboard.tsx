@@ -18,6 +18,7 @@ import { ScoreCircle } from "@/components/score-circle";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { ScoreDetailsModal } from "@/components/score-details-modal";
+import { GridBackground } from "@/components/grid-background";
 import type { User, Score } from "@shared/schema";
 
 interface DashboardData {
@@ -88,13 +89,28 @@ export default function HRDashboard() {
 
   return (
     <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">HR Dashboard</h1>
-          <p className="text-muted-foreground">Organization-wide performance overview</p>
+      {/* Header with 3D Background */}
+      <div className="relative flex items-center justify-between pb-6 -mx-8 px-8">
+        <GridBackground />
+        <div className="relative z-10">
+          <motion.h1 
+            className="text-3xl font-bold text-foreground"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            HR Dashboard
+          </motion.h1>
+          <motion.p 
+            className="text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            Organization-wide performance overview
+          </motion.p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative z-10">
           <Button variant="outline" onClick={exportToCSV} data-testid="button-export-csv">
             <Download className="w-4 h-4 mr-2" />
             Export CSV

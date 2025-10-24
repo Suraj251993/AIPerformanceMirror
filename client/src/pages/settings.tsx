@@ -18,7 +18,8 @@ import {
   FileText,
   Mail,
   Send,
-  Clock
+  Clock,
+  Users
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -28,6 +29,7 @@ import { format } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import type { User } from "@shared/schema";
 
 interface Settings {
   scoringWeights: {
@@ -116,6 +118,11 @@ export default function SettingsPage() {
 
   const { data: deliveryLogs } = useQuery<DeliveryLog[]>({
     queryKey: ["/api/email-reports/delivery-log"],
+    enabled: user?.role === "HR_ADMIN",
+  });
+
+  const { data: allUsers } = useQuery<User[]>({
+    queryKey: ["/api/users"],
     enabled: user?.role === "HR_ADMIN",
   });
 
@@ -326,6 +333,36 @@ export default function SettingsPage() {
     },
   });
 
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const response = await fetch(`/api/users/${userId}/role`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update role");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User role updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user role",
+        variant: "destructive",
+      });
+    },
+  });
+
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   return (
@@ -336,12 +373,15 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="integration" className="space-y-6">
-        <TabsList className={`grid w-full max-w-2xl ${user?.role === 'HR_ADMIN' ? 'grid-cols-4' : 'grid-cols-3'}`} data-testid="tabs-settings">
+        <TabsList className={`grid w-full max-w-2xl ${user?.role === 'HR_ADMIN' ? 'grid-cols-5' : 'grid-cols-3'}`} data-testid="tabs-settings">
           <TabsTrigger value="integration" data-testid="tab-integration">Integration</TabsTrigger>
           <TabsTrigger value="scoring" data-testid="tab-scoring">Scoring</TabsTrigger>
           <TabsTrigger value="sync" data-testid="tab-sync">Data Sync</TabsTrigger>
           {user?.role === 'HR_ADMIN' && (
-            <TabsTrigger value="email" data-testid="tab-email">Email Reports</TabsTrigger>
+            <>
+              <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
+              <TabsTrigger value="email" data-testid="tab-email">Email Reports</TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -702,6 +742,79 @@ export default function SettingsPage() {
             </Card>
           </motion.div>
         </TabsContent>
+
+        {user?.role === 'HR_ADMIN' && (
+          <TabsContent value="users" className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    User Management
+                  </CardTitle>
+                  <CardDescription>Manage user roles and permissions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!allUsers || allUsers.length === 0 ? (
+                    <Alert>
+                      <AlertDescription>
+                        No users found in the system yet.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="space-y-3">
+                      {allUsers.map((u) => (
+                        <div
+                          key={u.id}
+                          className="flex items-center justify-between p-4 border rounded-lg hover-elevate"
+                          data-testid={`user-row-${u.id}`}
+                        >
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">
+                                {u.firstName} {u.lastName}
+                              </span>
+                              {u.id === user?.id && (
+                                <Badge variant="outline" className="text-xs">You</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{u.email}</p>
+                            {u.department && (
+                              <p className="text-xs text-muted-foreground">Department: {u.department}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={u.role || "EMPLOYEE"}
+                              onValueChange={(newRole) => {
+                                updateUserRoleMutation.mutate({ userId: u.id, role: newRole });
+                              }}
+                              disabled={u.id === user?.id}
+                              data-testid={`select-role-${u.id}`}
+                            >
+                              <SelectTrigger className="w-40">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="HR_ADMIN">HR Admin</SelectItem>
+                                <SelectItem value="MANAGER">Manager</SelectItem>
+                                <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
+        )}
 
         {user?.role === 'HR_ADMIN' && (
           <TabsContent value="email" className="space-y-6">

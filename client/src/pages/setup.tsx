@@ -32,10 +32,10 @@ export default function Setup() {
         title: "Success!",
         description: "You are now an HR Administrator. Redirecting...",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setTimeout(() => {
-        setLocation("/");
-      }, 2000);
+        window.location.href = "/";
+      }, 1500);
     },
     onError: (error: any) => {
       toast({

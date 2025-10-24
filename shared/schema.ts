@@ -35,7 +35,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role", { length: 20 }).notNull().default('EMPLOYEE').$type<UserRole>(),
+  role: varchar("role", { length: 20 }).$type<UserRole | null>(),
   department: varchar("department"),
   managerId: varchar("manager_id"),
   createdAt: timestamp("created_at").defaultNow(),

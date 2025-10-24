@@ -37,6 +37,7 @@ export interface IStorage {
   // Additional user operations
   getUsersByRole(role: string): Promise<User[]>;
   getUsersByManager(managerId: string): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
   
   // Project operations
   getAllProjects(): Promise<Project[]>;
@@ -111,6 +112,10 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByManager(managerId: string): Promise<User[]> {
     return await db.select().from(users).where(eq(users.managerId, managerId));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
   }
 
   // Project operations

@@ -63,6 +63,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Management endpoints (HR Admin only)
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch('/api/users/:id/role', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      const targetUserId = req.params.id;
+      const { role } = req.body;
+
+      if (!['HR_ADMIN', 'MANAGER', 'EMPLOYEE'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role' });
+      }
+
+      await db
+        .update(users)
+        .set({ role: role as any })
+        .where(eq(users.id, targetUserId));
+
+      const updatedUser = await storage.getUser(targetUserId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
   // Seed mock data endpoint (for development)
   app.post('/api/seed', async (req, res) => {
     try {

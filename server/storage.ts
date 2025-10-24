@@ -9,6 +9,8 @@ import {
   auditLogs,
   sprints,
   sprintItems,
+  reportSubscriptions,
+  reportDeliveryLog,
   type User,
   type UpsertUser,
   type Project,
@@ -21,6 +23,8 @@ import {
   type AuditLog,
   type Sprint,
   type SprintItem,
+  type ReportSubscription,
+  type ReportDelivery,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -72,6 +76,11 @@ export interface IStorage {
   getSprintItemsBySprint(sprintId: string): Promise<SprintItem[]>;
   getSprintItemsByAssignee(assigneeId: string): Promise<SprintItem[]>;
   upsertSprintItem(item: { id: string; sprintId?: string; projectId?: string; title: string; description: string; itemType: string; status: string; priority: string; storyPoints?: number; assigneeId?: string }): Promise<SprintItem>;
+  
+  // Email report operations
+  getReportSubscription(userId: string): Promise<{ dailyEnabled: boolean; weeklyEnabled: boolean } | undefined>;
+  upsertReportSubscription(userId: string, settings: { dailyEnabled: boolean; weeklyEnabled: boolean }): Promise<{ dailyEnabled: boolean; weeklyEnabled: boolean }>;
+  getReportDeliveryLog(userId: string, limit?: number): Promise<ReportDelivery[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -262,6 +271,88 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return item;
+  }
+
+  // Email report operations
+  async getReportSubscription(userId: string): Promise<{ dailyEnabled: boolean; weeklyEnabled: boolean } | undefined> {
+    const subscriptions = await db
+      .select()
+      .from(reportSubscriptions)
+      .where(eq(reportSubscriptions.userId, userId));
+
+    if (subscriptions.length === 0) {
+      return undefined;
+    }
+
+    const dailySub = subscriptions.find(s => s.reportType === 'daily');
+    const weeklySub = subscriptions.find(s => s.reportType === 'weekly');
+
+    return {
+      dailyEnabled: dailySub?.enabled === 1,
+      weeklyEnabled: weeklySub?.enabled === 1,
+    };
+  }
+
+  async upsertReportSubscription(userId: string, settings: { dailyEnabled: boolean; weeklyEnabled: boolean }): Promise<{ dailyEnabled: boolean; weeklyEnabled: boolean }> {
+    // Upsert daily subscription
+    await db
+      .insert(reportSubscriptions)
+      .values({
+        userId,
+        reportType: 'daily',
+        frequency: 'daily',
+        enabled: settings.dailyEnabled ? 1 : 0,
+      })
+      .onConflictDoUpdate({
+        target: [reportSubscriptions.userId, reportSubscriptions.reportType],
+        set: {
+          enabled: settings.dailyEnabled ? 1 : 0,
+          updatedAt: new Date(),
+        },
+      });
+
+    // Upsert weekly subscription
+    await db
+      .insert(reportSubscriptions)
+      .values({
+        userId,
+        reportType: 'weekly',
+        frequency: 'weekly',
+        enabled: settings.weeklyEnabled ? 1 : 0,
+      })
+      .onConflictDoUpdate({
+        target: [reportSubscriptions.userId, reportSubscriptions.reportType],
+        set: {
+          enabled: settings.weeklyEnabled ? 1 : 0,
+          updatedAt: new Date(),
+        },
+      });
+
+    return settings;
+  }
+
+  async getReportDeliveryLog(userId: string, limit: number = 50): Promise<ReportDelivery[]> {
+    // First, get all subscriptions for this user
+    const userSubscriptions = await db
+      .select({ id: reportSubscriptions.id })
+      .from(reportSubscriptions)
+      .where(eq(reportSubscriptions.userId, userId));
+
+    if (userSubscriptions.length === 0) {
+      return [];
+    }
+
+    const subscriptionIds = userSubscriptions.map(s => s.id);
+
+    // Get delivery logs for user's subscriptions
+    const logs = await db
+      .select()
+      .from(reportDeliveryLog)
+      .where(sql`${reportDeliveryLog.subscriptionId} = ANY(${subscriptionIds})`)
+      .orderBy(desc(reportDeliveryLog.sentAt))
+      .limit(limit);
+
+    return logs;
   }
 }
 

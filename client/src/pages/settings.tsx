@@ -15,13 +15,19 @@ import {
   Settings2, 
   TrendingUp,
   Database,
-  FileText
+  FileText,
+  Mail,
+  Send,
+  Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Settings {
   scoringWeights: {
@@ -45,8 +51,28 @@ interface SyncLog {
   completedAt: Date;
 }
 
+interface EmailSubscription {
+  dailyEnabled: boolean;
+  weeklyEnabled: boolean;
+}
+
+interface EmailSchedule {
+  daily: { hour: number; minute: number };
+  weekly: { day: number; hour: number; minute: number };
+}
+
+interface DeliveryLog {
+  id: string;
+  reportType: string;
+  status: string;
+  recipientEmail: string;
+  errorMessage: string | null;
+  sentAt: Date;
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [weights, setWeights] = useState({
     taskCompletion: 30,
     timeliness: 20,
@@ -57,6 +83,14 @@ export default function SettingsPage() {
   });
   const [syncMinutes, setSyncMinutes] = useState(60);
   const [retentionDays, setRetentionDays] = useState(365);
+  const [emailSubscription, setEmailSubscription] = useState<EmailSubscription>({
+    dailyEnabled: false,
+    weeklyEnabled: false,
+  });
+  const [emailSchedule, setEmailSchedule] = useState<EmailSchedule>({
+    daily: { hour: 8, minute: 0 },
+    weekly: { day: 1, hour: 8, minute: 0 },
+  });
 
   const { data: connectionStatus, isLoading } = useQuery<{ connected: boolean }>({
     queryKey: ["/api/zoho/connection-status"],
@@ -70,6 +104,21 @@ export default function SettingsPage() {
     queryKey: ["/api/zoho/sync/logs"],
   });
 
+  const { data: subscription } = useQuery<EmailSubscription>({
+    queryKey: ["/api/email-reports/subscription"],
+    enabled: user?.role === "HR_ADMIN",
+  });
+
+  const { data: schedule } = useQuery<EmailSchedule>({
+    queryKey: ["/api/email-reports/schedule"],
+    enabled: user?.role === "HR_ADMIN",
+  });
+
+  const { data: deliveryLogs } = useQuery<DeliveryLog[]>({
+    queryKey: ["/api/email-reports/delivery-log"],
+    enabled: user?.role === "HR_ADMIN",
+  });
+
   useEffect(() => {
     if (settings) {
       setWeights(settings.scoringWeights);
@@ -77,6 +126,18 @@ export default function SettingsPage() {
       setRetentionDays(settings.dataRetention.days);
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (subscription) {
+      setEmailSubscription(subscription);
+    }
+  }, [subscription]);
+
+  useEffect(() => {
+    if (schedule) {
+      setEmailSchedule(schedule);
+    }
+  }, [schedule]);
 
   const total = Object.values(weights).reduce((sum, val) => sum + val, 0);
   const isValidTotal = Math.abs(total - 100) < 0.01;
@@ -186,6 +247,87 @@ export default function SettingsPage() {
     },
   });
 
+  const saveSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("/api/email-reports/subscription", "PUT", emailSubscription);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Subscription updated",
+        description: "Email report preferences saved successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-reports/subscription"] });
+    },
+    onError: () => {
+      toast({
+        title: "Update failed",
+        description: "Failed to save email subscription",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendTestEmailMutation = useMutation({
+    mutationFn: async (reportType: string) => {
+      return await apiRequest("/api/email-reports/test", "POST", { reportType });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Test email sent",
+        description: "Check your inbox for the test report",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to send",
+        description: "Could not send test email",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveDailyScheduleMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("/api/email-reports/daily-schedule", "PUT", emailSchedule.daily);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Schedule updated",
+        description: "Daily email time has been updated",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-reports/schedule"] });
+    },
+    onError: () => {
+      toast({
+        title: "Update failed",
+        description: "Failed to update daily schedule",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveWeeklyScheduleMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("/api/email-reports/weekly-schedule", "PUT", emailSchedule.weekly);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Schedule updated",
+        description: "Weekly email schedule has been updated",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/email-reports/schedule"] });
+    },
+    onError: () => {
+      toast({
+        title: "Update failed",
+        description: "Failed to update weekly schedule",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
   return (
     <div className="p-8 space-y-8">
       <div>
@@ -194,10 +336,13 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="integration" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3" data-testid="tabs-settings">
+        <TabsList className={`grid w-full max-w-2xl ${user?.role === 'HR_ADMIN' ? 'grid-cols-4' : 'grid-cols-3'}`} data-testid="tabs-settings">
           <TabsTrigger value="integration" data-testid="tab-integration">Integration</TabsTrigger>
           <TabsTrigger value="scoring" data-testid="tab-scoring">Scoring</TabsTrigger>
           <TabsTrigger value="sync" data-testid="tab-sync">Data Sync</TabsTrigger>
+          {user?.role === 'HR_ADMIN' && (
+            <TabsTrigger value="email" data-testid="tab-email">Email Reports</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="integration" className="space-y-6">
@@ -557,6 +702,237 @@ export default function SettingsPage() {
             </Card>
           </motion.div>
         </TabsContent>
+
+        {user?.role === 'HR_ADMIN' && (
+          <TabsContent value="email" className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="space-y-6"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="w-5 h-5" />
+                  Email Report Subscriptions
+                </CardTitle>
+                <CardDescription>Manage your automated performance report subscriptions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-1">
+                      <Label htmlFor="daily-reports" className="text-base">Daily Reports</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Receive a daily performance summary every morning
+                      </p>
+                    </div>
+                    <Switch
+                      id="daily-reports"
+                      checked={emailSubscription.dailyEnabled}
+                      onCheckedChange={(checked) => setEmailSubscription({ ...emailSubscription, dailyEnabled: checked })}
+                      data-testid="switch-daily-reports"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-1">
+                      <Label htmlFor="weekly-reports" className="text-base">Weekly Reports</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Receive a comprehensive weekly team performance report
+                      </p>
+                    </div>
+                    <Switch
+                      id="weekly-reports"
+                      checked={emailSubscription.weeklyEnabled}
+                      onCheckedChange={(checked) => setEmailSubscription({ ...emailSubscription, weeklyEnabled: checked })}
+                      data-testid="switch-weekly-reports"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    onClick={() => saveSubscriptionMutation.mutate()}
+                    disabled={saveSubscriptionMutation.isPending}
+                    data-testid="button-save-subscription"
+                  >
+                    Save Preferences
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => sendTestEmailMutation.mutate('daily')}
+                    disabled={sendTestEmailMutation.isPending}
+                    data-testid="button-test-daily"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Test Daily Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => sendTestEmailMutation.mutate('weekly')}
+                    disabled={sendTestEmailMutation.isPending}
+                    data-testid="button-test-weekly"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Test Weekly Report
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {user?.role === 'HR_ADMIN' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Email Schedule Configuration
+                  </CardTitle>
+                  <CardDescription>Configure when automated emails are sent (HR Admin only)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Daily Report Time</Label>
+                      <div className="flex gap-2">
+                        <Select
+                          value={emailSchedule.daily.hour.toString()}
+                          onValueChange={(val) => setEmailSchedule({
+                            ...emailSchedule,
+                            daily: { ...emailSchedule.daily, hour: Number(val) }
+                          })}
+                        >
+                          <SelectTrigger className="w-32" data-testid="select-daily-hour">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <SelectItem key={i} value={i.toString()}>
+                                {String(i).padStart(2, '0')}:00
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={() => saveDailyScheduleMutation.mutate()}
+                          disabled={saveDailyScheduleMutation.isPending}
+                          data-testid="button-save-daily-schedule"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Daily reports will be sent at {String(emailSchedule.daily.hour).padStart(2, '0')}:00
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Weekly Report Schedule</Label>
+                      <div className="flex gap-2 flex-wrap">
+                        <Select
+                          value={emailSchedule.weekly.day.toString()}
+                          onValueChange={(val) => setEmailSchedule({
+                            ...emailSchedule,
+                            weekly: { ...emailSchedule.weekly, day: Number(val) }
+                          })}
+                        >
+                          <SelectTrigger className="w-40" data-testid="select-weekly-day">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dayNames.map((day, index) => (
+                              <SelectItem key={index} value={index.toString()}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={emailSchedule.weekly.hour.toString()}
+                          onValueChange={(val) => setEmailSchedule({
+                            ...emailSchedule,
+                            weekly: { ...emailSchedule.weekly, hour: Number(val) }
+                          })}
+                        >
+                          <SelectTrigger className="w-32" data-testid="select-weekly-hour">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <SelectItem key={i} value={i.toString()}>
+                                {String(i).padStart(2, '0')}:00
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={() => saveWeeklyScheduleMutation.mutate()}
+                          disabled={saveWeeklyScheduleMutation.isPending}
+                          data-testid="button-save-weekly-schedule"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Weekly reports will be sent on {dayNames[emailSchedule.weekly.day]} at {String(emailSchedule.weekly.hour).padStart(2, '0')}:00
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Delivery History
+                </CardTitle>
+                <CardDescription>View recent email report deliveries</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!deliveryLogs || deliveryLogs.length === 0 ? (
+                  <Alert>
+                    <AlertDescription>
+                      No email deliveries recorded yet. Reports will appear here after they are sent.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="space-y-2">
+                    {deliveryLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover-elevate"
+                        data-testid={`delivery-log-${log.id}`}
+                      >
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium capitalize">{log.reportType} Report</span>
+                            <Badge
+                              variant={log.status === 'sent' ? 'default' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {log.status}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            To: {log.recipientEmail}
+                            {log.sentAt && ` • ${format(new Date(log.sentAt), 'PPp')}`}
+                          </p>
+                          {log.errorMessage && (
+                            <p className="text-xs text-destructive">{log.errorMessage}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </TabsContent>
+        )}
       </Tabs>
     </div>
   );

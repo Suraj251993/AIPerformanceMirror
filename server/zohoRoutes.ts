@@ -314,4 +314,185 @@ export function registerZohoRoutes(app: Express) {
       res.status(500).json({ message: 'Failed to update data retention policy' });
     }
   });
+
+  // Email report endpoints (HR Admin only)
+  app.get('/api/email-reports/subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can manage email reports' });
+      }
+
+      const subscription = await storage.getReportSubscription(userId);
+      res.json(subscription || { dailyEnabled: false, weeklyEnabled: false });
+    } catch (error: any) {
+      console.error('Error fetching subscription:', error);
+      res.status(500).json({ message: 'Failed to fetch subscription' });
+    }
+  });
+
+  app.put('/api/email-reports/subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can manage email reports' });
+      }
+
+      const { dailyEnabled, weeklyEnabled } = req.body;
+      
+      const subscription = await storage.upsertReportSubscription(userId, {
+        dailyEnabled: dailyEnabled || false,
+        weeklyEnabled: weeklyEnabled || false,
+      });
+
+      res.json({ message: 'Subscription updated successfully', subscription });
+    } catch (error: any) {
+      console.error('Error updating subscription:', error);
+      res.status(500).json({ message: 'Failed to update subscription' });
+    }
+  });
+
+  app.post('/api/email-reports/test', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can send test emails' });
+      }
+
+      if (!user?.email) {
+        return res.status(400).json({ message: 'No email address found for user' });
+      }
+
+      const { reportType } = req.body;
+      const { ReportGenerator } = await import('./reportGenerator.js');
+      const { emailService } = await import('./emailService.js');
+      
+      let html: string;
+      let subject: string;
+
+      if (reportType === 'daily') {
+        html = await ReportGenerator.generateDailyReport(userId);
+        subject = `[TEST] Daily Performance Report - ${new Date().toLocaleDateString()}`;
+      } else if (reportType === 'weekly') {
+        html = await ReportGenerator.generateWeeklyReport(userId);
+        subject = `[TEST] Weekly Performance Report - Week of ${new Date().toLocaleDateString()}`;
+      } else {
+        return res.status(400).json({ message: 'Invalid report type' });
+      }
+
+      await emailService.sendEmail({
+        to: user.email,
+        subject,
+        html,
+      });
+
+      res.json({ message: `Test ${reportType} report sent to ${user.email}` });
+    } catch (error: any) {
+      console.error('Error sending test email:', error);
+      res.status(500).json({ message: 'Failed to send test email' });
+    }
+  });
+
+  app.get('/api/email-reports/delivery-log', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can view delivery logs' });
+      }
+
+      const logs = await storage.getReportDeliveryLog(userId);
+      res.json(logs);
+    } catch (error: any) {
+      console.error('Error fetching delivery log:', error);
+      res.status(500).json({ message: 'Failed to fetch delivery log' });
+    }
+  });
+
+  app.get('/api/email-reports/schedule', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can view schedule settings' });
+      }
+
+      const { SyncService } = await import('./syncService.js');
+      const dailySettings = await SyncService.getSyncSettings('daily_email_time');
+      const weeklySettings = await SyncService.getSyncSettings('weekly_email_schedule');
+
+      res.json({
+        daily: {
+          hour: dailySettings?.hour || 8,
+          minute: dailySettings?.minute || 0,
+        },
+        weekly: {
+          day: weeklySettings?.day || 1,
+          hour: weeklySettings?.hour || 8,
+          minute: weeklySettings?.minute || 0,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching schedule:', error);
+      res.status(500).json({ message: 'Failed to fetch schedule' });
+    }
+  });
+
+  app.put('/api/email-reports/daily-schedule', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can update schedule' });
+      }
+
+      const { hour, minute } = req.body;
+      
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        return res.status(400).json({ message: 'Invalid time format' });
+      }
+
+      const { syncScheduler } = await import('./scheduler.js');
+      await syncScheduler.updateDailyEmailTime(hour, minute);
+
+      res.json({ message: 'Daily email schedule updated successfully', hour, minute });
+    } catch (error: any) {
+      console.error('Error updating daily schedule:', error);
+      res.status(500).json({ message: 'Failed to update daily schedule' });
+    }
+  });
+
+  app.put('/api/email-reports/weekly-schedule', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can update schedule' });
+      }
+
+      const { day, hour, minute } = req.body;
+      
+      if (day < 0 || day > 6 || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        return res.status(400).json({ message: 'Invalid schedule format' });
+      }
+
+      const { syncScheduler } = await import('./scheduler.js');
+      await syncScheduler.updateWeeklyEmailSchedule(day, hour, minute);
+
+      res.json({ message: 'Weekly email schedule updated successfully', day, hour, minute });
+    } catch (error: any) {
+      console.error('Error updating weekly schedule:', error);
+      res.status(500).json({ message: 'Failed to update weekly schedule' });
+    }
+  });
 }

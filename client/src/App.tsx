@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import SettingsPage from "@/pages/settings";
 import Landing from "@/pages/landing";
+import Setup from "@/pages/setup";
 import HRDashboard from "@/pages/hr-dashboard";
 import ManagerDashboard from "@/pages/manager-dashboard";
 import EmployeeView from "@/pages/employee-view";
@@ -34,6 +35,17 @@ function Router() {
       <Switch>
         <Route path="/" component={Landing} />
         <Route component={Landing} />
+      </Switch>
+    );
+  }
+
+  // If user has no role, redirect to setup page
+  if (!user?.role) {
+    return (
+      <Switch>
+        <Route path="/setup" component={Setup} />
+        <Route path="/" component={Setup} />
+        <Route component={Setup} />
       </Switch>
     );
   }

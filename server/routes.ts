@@ -28,6 +28,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Setup routes - for first-time HR admin setup
+  app.get('/api/setup/check', isAuthenticated, async (req: any, res) => {
+    try {
+      const hrAdmins = await storage.getUsersByRole('HR_ADMIN');
+      res.json({ hasAdmin: hrAdmins.length > 0 });
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      res.status(500).json({ message: "Failed to check admin status" });
+    }
+  });
+
+  app.post('/api/setup/claim-admin', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check if any HR admin already exists
+      const hrAdmins = await storage.getUsersByRole('HR_ADMIN');
+      if (hrAdmins.length > 0) {
+        return res.status(400).json({ message: "An HR Administrator already exists" });
+      }
+
+      // Update current user to HR_ADMIN
+      await db
+        .update(users)
+        .set({ role: 'HR_ADMIN' })
+        .where(eq(users.id, userId));
+
+      const updatedUser = await storage.getUser(userId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error claiming admin role:", error);
+      res.status(500).json({ message: "Failed to claim admin role" });
+    }
+  });
+
   // Seed mock data endpoint (for development)
   app.post('/api/seed', async (req, res) => {
     try {

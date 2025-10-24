@@ -73,7 +73,10 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                 <div className="space-y-4">
                   {Object.entries(data.latestScore.components).map(([key, value], index) => {
                     if (key === 'weights') return null;
-                    const weight = data.latestScore!.components.weights[key as keyof typeof data.latestScore.components.weights];
+                    
+                    // Safely get weight, default to 0 if not found
+                    const weights = data.latestScore!.components.weights || {};
+                    const weight = weights[key as keyof typeof weights] || 0;
                     
                     return (
                       <motion.div
@@ -85,7 +88,7 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                       >
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium">
-                            {componentLabels[key as keyof typeof componentLabels]}
+                            {componentLabels[key as keyof typeof componentLabels] || key}
                           </span>
                           <span className="text-muted-foreground">
                             {(value as number).toFixed(1)} × {(weight * 100).toFixed(0)}% weight

@@ -4,6 +4,24 @@
 
 AI Performance Mirror is an enterprise employee performance analytics application that integrates with Zoho Projects and Zoho Sprints to provide real-time performance tracking and insights. The application serves three distinct user roles: HR Administrators (organization-wide visibility), Managers (team oversight), and Employees (personal performance views). The system computes AI-driven performance scores based on task completion, timeliness, collaboration, feedback, and other metrics, presenting them through data-rich dashboards with 3D visualizations.
 
+## Demo Accounts
+
+The application includes three pre-configured demo accounts for testing different role levels:
+
+| Role | Email | Name | Department | Access Level |
+|------|-------|------|-----------|--------------|
+| **HR Admin** | `hr.demo@company.com` | Sarah Admin | Human Resources | Full system access, user management, settings |
+| **Manager** | `manager.demo@company.com` | Michael Manager | Engineering | Team oversight, employee performance |
+| **Employee** | `employee.demo@company.com` | Emma Developer | Engineering | Personal performance view |
+
+**How to Use Demo Accounts:**
+1. Sign in using Replit Auth (Google, GitHub, or Email)
+2. When prompted, use one of the demo email addresses above
+3. The system automatically assigns the pre-configured role
+4. Each role sees a different dashboard and has different permissions
+
+**Note:** Emma Developer reports to Michael Manager in the organizational hierarchy.
+
 ## Recent Changes
 
 **October 24, 2025**

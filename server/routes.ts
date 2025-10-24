@@ -70,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const needsAttention = scoresWithValues.filter(e => (e.latestScore?.scoreValue || 0) < 60).length;
 
       // Calculate department stats
-      const departments = [...new Set(allEmployees.map(e => e.department).filter(Boolean))];
+      const departments = Array.from(new Set(allEmployees.map(e => e.department).filter(Boolean)));
       const departmentStats = departments.map(dept => {
         const deptEmployees = employeesWithScores.filter(e => e.department === dept);
         const deptScores = deptEmployees.filter(e => e.latestScore);

@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { syncScheduler } from "./scheduler";
 
 const app = express();
 
@@ -77,5 +78,8 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    syncScheduler.start().catch(err => {
+      console.error('Failed to start sync scheduler:', err);
+    });
   });
 })();

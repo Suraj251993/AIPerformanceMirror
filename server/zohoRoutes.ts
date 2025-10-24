@@ -9,7 +9,7 @@ const pendingAuths = new Map<string, { userId: string; timestamp: number }>();
 
 setInterval(() => {
   const now = Date.now();
-  for (const [state, data] of pendingAuths.entries()) {
+  for (const [state, data] of Array.from(pendingAuths.entries())) {
     if (now - data.timestamp > 600000) {
       pendingAuths.delete(state);
     }
@@ -188,6 +188,17 @@ export function registerZohoRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error syncing tasks:', error);
       res.status(500).json({ message: 'Failed to sync tasks' });
+    }
+  });
+
+  app.get('/api/zoho/sync/logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const { SyncService } = await import('./syncService.js');
+      const logs = await SyncService.getRecentSyncLogs(50);
+      res.json(logs);
+    } catch (error: any) {
+      console.error('Error fetching sync logs:', error);
+      res.status(500).json({ message: 'Failed to fetch sync logs' });
     }
   });
 }

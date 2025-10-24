@@ -201,4 +201,117 @@ export function registerZohoRoutes(app: Express) {
       res.status(500).json({ message: 'Failed to fetch sync logs' });
     }
   });
+
+  app.get('/api/settings/all', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can access settings' });
+      }
+
+      const { SyncService } = await import('./syncService.js');
+      
+      const scoringWeights = await SyncService.getSyncSettings('scoring_weights') || {
+        taskCompletion: 30,
+        timeliness: 20,
+        efficiency: 10,
+        velocity: 15,
+        collaboration: 5,
+        feedback: 20
+      };
+
+      const syncInterval = await SyncService.getSyncSettings('sync_interval') || { minutes: 60 };
+      const dataRetention = await SyncService.getSyncSettings('data_retention') || { days: 365 };
+
+      res.json({
+        scoringWeights,
+        syncInterval,
+        dataRetention
+      });
+    } catch (error: any) {
+      console.error('Error fetching settings:', error);
+      res.status(500).json({ message: 'Failed to fetch settings' });
+    }
+  });
+
+  app.put('/api/settings/scoring-weights', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can update settings' });
+      }
+
+      const weights = req.body;
+      const total = Object.values(weights).reduce((sum: any, val: any) => sum + (Number(val) || 0), 0);
+      
+      if (Math.abs(total - 100) > 0.01) {
+        return res.status(400).json({ message: 'Weights must sum to 100%' });
+      }
+
+      const { SyncService } = await import('./syncService.js');
+      await SyncService.setSyncSettings('scoring_weights', weights);
+
+      res.json({ message: 'Scoring weights updated successfully', weights });
+    } catch (error: any) {
+      console.error('Error updating scoring weights:', error);
+      res.status(500).json({ message: 'Failed to update scoring weights' });
+    }
+  });
+
+  app.put('/api/settings/sync-interval', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can update settings' });
+      }
+
+      const { minutes } = req.body;
+      
+      if (!minutes || minutes < 1 || minutes > 1440) {
+        return res.status(400).json({ message: 'Sync interval must be between 1 and 1440 minutes' });
+      }
+
+      const { SyncService } = await import('./syncService.js');
+      await SyncService.setSyncSettings('sync_interval', { minutes });
+
+      const { syncScheduler } = await import('./scheduler.js');
+      await syncScheduler.updateInterval(minutes);
+
+      res.json({ message: 'Sync interval updated successfully', minutes });
+    } catch (error: any) {
+      console.error('Error updating sync interval:', error);
+      res.status(500).json({ message: 'Failed to update sync interval' });
+    }
+  });
+
+  app.put('/api/settings/data-retention', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can update settings' });
+      }
+
+      const { days } = req.body;
+      
+      if (!days || days < 30 || days > 3650) {
+        return res.status(400).json({ message: 'Data retention must be between 30 and 3650 days' });
+      }
+
+      const { SyncService } = await import('./syncService.js');
+      await SyncService.setSyncSettings('data_retention', { days });
+
+      res.json({ message: 'Data retention policy updated successfully', days });
+    } catch (error: any) {
+      console.error('Error updating data retention:', error);
+      res.status(500).json({ message: 'Failed to update data retention policy' });
+    }
+  });
 }

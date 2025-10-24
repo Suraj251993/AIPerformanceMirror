@@ -12,6 +12,7 @@ import NotFound from "@/pages/not-found";
 import SettingsPage from "@/pages/settings";
 import Landing from "@/pages/landing";
 import Setup from "@/pages/setup";
+import DemoLogin from "@/pages/demo-login";
 import HRDashboard from "@/pages/hr-dashboard";
 import ManagerDashboard from "@/pages/manager-dashboard";
 import EmployeeView from "@/pages/employee-view";
@@ -39,7 +40,19 @@ function Router() {
     );
   }
 
-  // If user has no role, redirect to setup page
+  // Show demo login for authenticated users to select role
+  // This allows users to test different roles without multiple auth flows
+  if (isAuthenticated && !user) {
+    return (
+      <Switch>
+        <Route path="/demo" component={DemoLogin} />
+        <Route path="/" component={DemoLogin} />
+        <Route component={DemoLogin} />
+      </Switch>
+    );
+  }
+
+  // If user has no role, redirect to setup page (for non-demo mode)
   if (!user?.role) {
     return (
       <Switch>

@@ -25,6 +25,13 @@ The application includes three pre-configured demo accounts for testing differen
 ## Recent Changes
 
 **October 24, 2025**
+- ✅ Implemented Demo Login System
+  - Created role selection page with 3 cards (HR Admin, Manager, Employee)
+  - Added backend API endpoint `/api/demo/set-role` to store role in session
+  - Updated auth middleware to return demo user based on session role
+  - Modified App.tsx routing to show demo login after authentication
+  - Cleaned up database, keeping only 3 demo accounts
+  - Users can now sign in once and test all 3 roles without multiple auth flows
 - ✅ Completed Task 6: Automated Email Reporting System
   - Implemented email service with SMTP integration and retry logic
   - Added database schema for report subscriptions and delivery logs

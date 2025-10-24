@@ -77,10 +77,7 @@ export default function DemoLogin() {
 
   const setRoleMutation = useMutation({
     mutationFn: async (role: DemoRole) => {
-      return apiRequest('/api/demo/set-role', {
-        method: 'POST',
-        body: { role },
-      });
+      return apiRequest('POST', '/api/demo/set-role', { role });
     },
     onSuccess: (data, role) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });

@@ -40,25 +40,14 @@ function Router() {
     );
   }
 
-  // Show demo login for authenticated users to select role
-  // This allows users to test different roles without multiple auth flows
-  if (isAuthenticated && !user) {
+  // If user has no role, show demo login to select role
+  // This allows easy testing of different roles
+  if (!user?.role) {
     return (
       <Switch>
         <Route path="/demo" component={DemoLogin} />
         <Route path="/" component={DemoLogin} />
         <Route component={DemoLogin} />
-      </Switch>
-    );
-  }
-
-  // If user has no role, redirect to setup page (for non-demo mode)
-  if (!user?.role) {
-    return (
-      <Switch>
-        <Route path="/setup" component={Setup} />
-        <Route path="/" component={Setup} />
-        <Route component={Setup} />
       </Switch>
     );
   }

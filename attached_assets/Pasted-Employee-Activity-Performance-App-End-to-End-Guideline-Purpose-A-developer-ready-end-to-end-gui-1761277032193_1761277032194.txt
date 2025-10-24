@@ -1,0 +1,313 @@
+Employee Activity Performance App — End-to-End Guideline
+
+Purpose: A developer-ready, end-to-end guideline you can paste into Replit AI Builder to help build a 2-role application (HR and Employee/Manager) that pulls activity data from Zoho Projects and Zoho Sprints and evaluates employees’ performance in near real-time. UI should be modern, catchy, with 3D elements and a dark-blue theme.
+
+1. Project Summary
+
+Goal: Build a web application that:
+
+Integrates with Zoho Projects and Zoho Sprints to ingest daily task/activity data.
+
+Provides two main login experiences: HR portal (org‑wide visibility) and Employee/Manager portal (self and team views).
+
+Computes a real‑time performance score per employee and per team, displayed via engaging 3D/dark‑blue dashboards.
+
+Includes feedback capture that contributes to performance scoring.
+
+Primary stakeholders: HR, People Ops, Engineering Managers, Individual Contributors, Product/Program Managers.
+
+Tech stack (recommended):
+
+Frontend: React (Vite or Next.js), Tailwind CSS, Three.js / React Three Fiber for 3D elements.
+
+Backend: Node.js + Express or Fastify, or Python Flask/FastAPI.
+
+Database: PostgreSQL (primary), Redis (caching/real‑time), optional timeseries DB (InfluxDB) for activity logs.
+
+Integration: Zoho Projects API, Zoho Sprints API (OAuth2), Webhooks if available.
+
+Hosting / Deployment: Replit for initial development; Docker + cloud provider (GCP/AWS) for production.
+
+2. Core Requirements (Functional)
+
+Authentication & Authorization
+
+OAuth2 login for Zoho integration (per user / per org token model).
+
+App-level auth: sign-in via company SSO (optional), or standard email/password + 2FA.
+
+Role-based access: HR_ADMIN, MANAGER, EMPLOYEE.
+
+Data Ingestion
+
+Pull tasks, time logs, comments, status changes, story points, and sprint assignments from Zoho Projects and Zoho Sprints.
+
+Support both scheduled pulls (cron every X minutes) and webhook-driven updates (real-time when Zoho supports webhooks).
+
+Dashboard & Views
+
+HR Dashboard: org-wide KPIs, department heatmaps, individual scorecards, trend views, export (CSV/PDF).
+
+Manager Dashboard: team member activity list, team score, daily/weekly summary, alerts for underperformance.
+
+Employee View: personal activity timeline, current score, feedback received, suggested improvements.
+
+Performance Scoring Engine
+
+Combine objective signals (task completes, time logged, SLA adherence, velocity) + subjective inputs (feedback) into a score.
+
+Feedback Module
+
+Allow peers/managers/HR to give feedback with numeric rating + short comment.
+
+Feedback contributes a configurable % weight to the overall score.
+
+Reporting & Exports
+
+Daily email summary (optional), weekly report to managers and HR.
+
+CSV/PDF exports for audits and reviews.
+
+Privacy & Compliance
+
+Data retention controls, role-based masking of PII, GDPR/PDPA consideration as needed.
+
+3. Non-functional Requirements
+
+Real-time-ish: data should be updated within configurable window (e.g., 5–15 minutes) depending on webhooks and rate limits.
+
+Scalable: support thousands of employees; use background workers for ingestion and scoring.
+
+Secure: encrypted tokens, least privilege, audit logs for data access.
+
+Usable & Attractive: modern 3D visual accents but performant on standard workstations.
+
+4. Integration Design (Zoho Projects & Sprints)
+4.1 Authentication to Zoho
+
+Use OAuth2 with Zoho; request scopes: projects.read, sprints.read (or equivalent). Store refresh tokens encrypted.
+
+4.2 Data to Pull
+
+From Zoho Projects: tasks (id, title, assignee, status, start/end dates, time logs, comments), milestones, custom fields.
+
+From Zoho Sprints: user stories, issues, sprint membership, estimation points, status transitions, comments.
+
+Other signals: attachments added, comments, time spent entries.
+
+4.3 Data Sync Strategies
+
+Webhooks (preferred): subscribe to task events -> process in webhook consumer endpoint.
+
+Polling (fallback): cron jobs that call Zoho APIs with modified_after timestamps to fetch deltas.
+
+4.4 Rate Limiting & Error Handling
+
+Build exponential backoff and retry. Track API quota; batch requests where possible.
+
+5. Data Model (high-level)
+
+Tables (Postgres)
+
+users (id, name, email, role, zoho_user_id, org_id, manager_id, created_at)
+
+orgs (id, name, zoho_oauth_token*, token_expiry, refresh_token_encrypted)
+
+projects (id, org_id, zoho_project_id, name)
+
+tasks (id, project_id, zoho_task_id, title, assignee_id, status, points, created_at, updated_at)
+
+time_logs (id, task_id, user_id, minutes, logged_at)
+
+activity_events (id, user_id, source_type, payload_json, event_time)
+
+feedback (id, from_user_id, to_user_id, rating, comment, created_at)
+
+scores (id, user_id, date, score_value, components_json)
+
+audit_logs (id, user_id, action, target, created_at)
+
+*Store OAuth tokens encrypted using KMS or env-key.
+
+6. Performance Scoring (recommended approach)
+
+Design principles: transparent, configurable, explainable.
+
+6.1 Signals & Weights (example)
+
+Task Completion Rate: 30%
+
+Timeliness (met deadlines): 20%
+
+Time Logged vs Estimate (efficiency): 10%
+
+Sprint Velocity / Story Points closed: 15%
+
+Collaboration (comments, PR/issue comments): 5%
+
+Feedback Score (peer & manager): 20% (configurable)
+
+Weights must be configurable by HR.
+
+6.2 Aggregation
+
+Compute normalized sub-scores (0–100) for each signal per day.
+
+Multiply by weights and sum to get total daily score.
+
+Keep rolling window (7d, 30d) averages for trend and smoothing.
+
+6.3 Example pseudocode
+for each user:
+  task_score = normalize(tasks_completed_today / tasks_assigned_today)
+  timeliness_score = normalize(percent_tasks_on_time)
+  feedback_score = average(feedback_ratings_last_30_days)
+  total = sum(weight_i * signal_i)
+  persist to scores table
+7. Feedback Module Details
+
+Feedback form: rating (1-5), category (communication, delivery, collaboration), comment.
+
+Admin controls to configure how much weight feedback contributes to total score.
+
+Optional anonymity toggle with auditability (audit logs still record origin for HR).
+
+8. UI/UX Guidelines (design language)
+
+Theme: Dark Blue primary palette (suggested hexs: #0B1F3A dark, #123B6A, #1E6FB8 accent, #0E2940 background). Use high contrast white/soft-gray text.
+
+3D Elements:
+
+Use subtle 3D widgets made with React Three Fiber: floating KPI cards, orbiting data nodes, layered depth in hero banner.
+
+Avoid heavy scenes; keep 3D simple to preserve performance (e.g., soft shadows, extruded card effects, glassmorphism panels).
+
+Typography & Spacing:
+
+Clean sans-serif (Inter or Poppins). Large headline (xl), readable body (base), comfortable padding (p-4 / p-6).
+
+Components & Pages:
+
+Login / OAuth screen
+
+HR Dashboard (org metrics, heatmap, table of employees)
+
+Manager Dashboard (team list, alerts)
+
+Employee Profile (activity timeline, score history, feedback)
+
+Score Details modal (show breakdown of components)
+
+Admin settings (weight configuration, retention, integrations)
+
+Microinteractions: use subtle motion on hover and card entrance. Use Framer Motion for smooth transitions.
+
+9. API Design (sample endpoints)
+
+Auth
+
+POST /api/auth/login — app login
+
+GET /api/auth/zoho/oauth — redirect to Zoho OAuth
+
+GET /api/auth/zoho/callback — handle Zoho callback
+
+Users
+
+GET /api/users/:id — get profile
+
+GET /api/users/:id/activities?from=&to= — activity timeline
+
+Ingest
+
+POST /api/ingest/webhook/zoho — webhook consumer
+
+POST /api/ingest/poll — manual poll endpoint
+
+Scores
+
+GET /api/scores/:userId?from=&to= — scores for user
+
+POST /api/scores/recompute — re-run scoring (admin)
+
+Feedback
+
+POST /api/feedback — submit feedback
+
+GET /api/feedback/to/:userId — list feedback received
+
+All endpoints must enforce role checks and rate limits.
+
+10. Security & Privacy
+
+Encrypt tokens at rest. Use HTTPS/TLS.
+
+Role-based access enforcement.
+
+Audit logs for data access and administrative changes.
+
+Data retention policy: default 1 year for detailed activity; aggregated scores keep longer.
+
+Compliance: identify applicable laws (GDPR, PDPA Malaysia) and provide user data export & deletion flows.
+
+11. Testing Strategy
+
+Unit tests for scoring logic (critical). Use Jest (JS) or Pytest (Python).
+
+Integration tests for Zoho API connectors (mock Zoho responses).
+
+E2E tests for UI flows (Cypress/Playwright).
+
+Load tests for ingestion pipeline (k6).
+
+12. Deployment & Replit Instructions (quick start)
+
+1) Replit dev setup (recommended for prototypes):
+
+Create a new Replit (Node/React template). Add .env keys for DATABASE_URL, ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, JWT_SECRET.
+
+Install server dependencies (express, axios, pg) and client deps (react, tailwindcss, react-three-fiber, framer-motion).
+
+Add a webhook route exposed publicly via Replit URL for Zoho webhooks (use a staging org/test project in Zoho).
+
+2) Local run commands
+
+npm install
+
+npm run dev (frontend + backend concurrently)
+
+3) Persistence
+
+Use Replit DB for quick prototyping or connect to managed Postgres via external connection string.
+
+4) Environment & Secrets
+
+Securely store OAuth secrets in Replit secrets. Rotate periodically.
+
+13. MVP Roadmap & Backlog (suggested sprint plan)
+
+Sprint 0 (setup): project skeleton, auth, basic UI theme, DB
+
+Sprint 1 (integrations): Zoho OAuth + polling, ingest tasks into DB
+
+Sprint 2 (scoring & dashboards): basic scoring engine, employee page, manager page
+
+Sprint 3 (feedback & HR views): feedback module, HR dashboard, export
+
+Sprint 4 (polish): 3D UX additions, admin settings, testing & monitoring
+
+14. Acceptance Criteria (examples)
+
+HR can view any employee's score and drill into last 30 days activities.
+
+Manager can view their team members and receive alerts when a member's daily score drops below threshold.
+
+App ingests a task update from Zoho and the affected user's score updates within the configured window (e.g., 10 min).
+
+Feedback submitted by a manager appears in the employee's profile and influences the next scoring cycle.
+
+15. Ready-to-paste Replit AI Builder Prompt
+
+Title: Build Employee Activity Performance App (Zoho Projects & Sprints integration)
+
+Description / Objective: Build a two-rol

@@ -32,6 +32,13 @@ The application includes three pre-configured demo accounts for testing differen
   - Modified App.tsx routing to show demo login after authentication
   - Cleaned up database, keeping only 3 demo accounts
   - Users can now sign in once and test all 3 roles without multiple auth flows
+  - **Fixed dashboard endpoints** to respect demo mode and show real data
+- ✅ Added 30 Sample Employees
+  - 6 departments: Engineering, Sales, Marketing, Finance, Product, HR
+  - 6 active projects with 20 tasks
+  - Performance scores distributed realistically (65-95 range)
+  - 18 time logs and 10 feedback entries
+  - All dashboards now display production-like data
 - ✅ Completed Task 6: Automated Email Reporting System
   - Implemented email service with SMTP integration and retry logic
   - Added database schema for report subscriptions and delivery logs

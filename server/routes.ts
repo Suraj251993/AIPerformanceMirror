@@ -9,6 +9,24 @@ import { users, feedback as feedbackTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { registerZohoRoutes } from "./zohoRoutes";
 
+// Helper function to get current user (respecting demo mode)
+async function getCurrentUser(req: any): Promise<any> {
+  // Check if demo role is set in session
+  if (req.session.demoRole) {
+    const demoUserMap: Record<string, string> = {
+      'HR_ADMIN': 'demo-hr-admin',
+      'MANAGER': 'demo-manager',
+      'EMPLOYEE': 'demo-employee',
+    };
+    const demoUserId = demoUserMap[req.session.demoRole];
+    return await storage.getUser(demoUserId);
+  }
+
+  // Otherwise return authenticated user
+  const userId = req.user.claims.sub;
+  return await storage.getUser(userId);
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -19,21 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      // Check if demo role is set in session
-      if (req.session.demoRole) {
-        const demoUserMap: Record<string, string> = {
-          'HR_ADMIN': 'demo-hr-admin',
-          'MANAGER': 'demo-manager',
-          'EMPLOYEE': 'demo-employee',
-        };
-        const demoUserId = demoUserMap[req.session.demoRole];
-        const demoUser = await storage.getUser(demoUserId);
-        return res.json(demoUser);
-      }
-
-      // Otherwise return authenticated user
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await getCurrentUser(req);
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -112,8 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User Management endpoints (HR Admin only)
   app.get('/api/users', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await getCurrentUser(req);
       
       if (user?.role !== 'HR_ADMIN') {
         return res.status(403).json({ message: 'Forbidden' });
@@ -129,8 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/users/:id/role', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await getCurrentUser(req);
       
       if (user?.role !== 'HR_ADMIN') {
         return res.status(403).json({ message: 'Forbidden' });
@@ -170,8 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // HR Dashboard endpoint
   app.get('/api/dashboard/hr', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await getCurrentUser(req);
       
       if (user?.role !== 'HR_ADMIN') {
         return res.status(403).json({ message: 'Forbidden' });
@@ -232,15 +233,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Manager Dashboard endpoint
   app.get('/api/dashboard/manager', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = await getCurrentUser(req);
       
       if (user?.role !== 'MANAGER') {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
-      // Get team members
-      const teamMembers = await storage.getUsersByManager(userId);
+      // Get team members (using demo user ID if in demo mode)
+      const teamMembers = await storage.getUsersByManager(user!.id);
       
       // Get latest scores for team members
       const teamWithScores = await Promise.all(
@@ -288,13 +288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Employee Dashboard endpoint
   app.get('/api/dashboard/employee', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const user = await getCurrentUser(req);
       
-      // Get latest score
-      const latestScore = await storage.getLatestScoreByUser(userId);
+      // Get latest score (using demo user ID if in demo mode)
+      const latestScore = await storage.getLatestScoreByUser(user!.id);
       
       // Get recent activities
-      const activities = await storage.getActivitiesByUser(userId, 10);
+      const activities = await storage.getActivitiesByUser(user!.id, 10);
       
       // Get feedback received with sender info
       const feedbackReceived = await db
@@ -313,7 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(feedbackTable)
         .innerJoin(users, eq(feedbackTable.fromUserId, users.id))
-        .where(eq(feedbackTable.toUserId, userId))
+        .where(eq(feedbackTable.toUserId, user!.id))
         .limit(5);
 
       // Generate improvement suggestions

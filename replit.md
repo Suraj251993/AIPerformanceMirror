@@ -24,6 +24,14 @@ The application includes three pre-configured demo accounts for testing differen
 
 ## Recent Changes
 
+**November 5, 2025**
+- ✅ Removed Feedback Score Component
+  - Eliminated feedback score from scoring engine calculations
+  - Updated default weight distribution (taskCompletion 35%, timeliness 25%, efficiency 15%, velocity 20%, collaboration 5%)
+  - Removed feedback display from score details modal and all dashboards
+  - Updated improvement suggestions to focus on remaining performance metrics
+  - Cleaned up shared schema and type definitions
+
 **October 24, 2025**
 - ✅ Implemented Demo Login System
   - Created role selection page with 3 cards (HR Admin, Manager, Employee)
@@ -122,10 +130,9 @@ The application implements a production-grade scoring engine (`server/scoringEng
 - **Efficiency**: Time logged vs. estimated hours ratio
 - **Sprint Velocity**: Real story points completed from Zoho Sprints data (replaces mock calculations)
 - **Collaboration**: Activity-based metrics (time logs, interactions)
-- **Feedback**: Peer and manager feedback ratings averaged
 
 **Scoring Engine Features:**
-- Uses configurable weights from `sync_settings` (default: taskCompletion 30%, timeliness 20%, efficiency 10%, velocity 15%, collaboration 5%, feedback 20%)
+- Uses configurable weights from `sync_settings` (default: taskCompletion 35%, timeliness 25%, efficiency 15%, velocity 20%, collaboration 5%)
 - `calculateVelocityScore()`: Queries actual sprint data, sums story points completed, calculates average velocity across completed sprints
 - `calculateUserScore()`: Orchestrates all components, applies weights, returns 0-100 score with detailed breakdown
 - `generateAllScores()`: Batch processing for all employees with automatic daily score persistence

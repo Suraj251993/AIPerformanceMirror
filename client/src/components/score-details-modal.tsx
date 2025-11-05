@@ -36,7 +36,6 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
     efficiency: "Efficiency",
     velocity: "Sprint Velocity",
     collaboration: "Collaboration",
-    feedback: "Feedback Score",
   };
 
   return (
@@ -72,7 +71,8 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                 <h3 className="text-lg font-semibold mb-4">Score Components</h3>
                 <div className="space-y-4">
                   {Object.entries(data.latestScore.components).map(([key, value], index) => {
-                    if (key === 'weights') return null;
+                    // Skip weights and feedback
+                    if (key === 'weights' || key === 'feedback') return null;
                     
                     // Safely get weight, default to 0 if not found
                     const weights = data.latestScore!.components.weights || {};
@@ -232,14 +232,18 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                   Current Weight Configuration
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  {Object.entries(data.latestScore.components.weights).map(([key, weight]) => (
-                    <div key={key} className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {componentLabels[key as keyof typeof componentLabels]}:
-                      </span>
-                      <span className="font-medium">{(weight * 100).toFixed(0)}%</span>
-                    </div>
-                  ))}
+                  {Object.entries(data.latestScore.components.weights).map(([key, weight]) => {
+                    // Skip feedback from weight display
+                    if (key === 'feedback') return null;
+                    return (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          {componentLabels[key as keyof typeof componentLabels]}:
+                        </span>
+                        <span className="font-medium">{(weight * 100).toFixed(0)}%</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
             )}

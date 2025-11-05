@@ -220,14 +220,12 @@ export interface ScoreComponents {
   efficiency: number;
   velocity: number;
   collaboration: number;
-  feedback: number;
   weights: {
     taskCompletion: number;
     timeliness: number;
     efficiency: number;
     velocity: number;
     collaboration: number;
-    feedback: number;
   };
 }
 

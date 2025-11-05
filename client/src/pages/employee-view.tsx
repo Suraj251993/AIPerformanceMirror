@@ -144,7 +144,7 @@ export default function EmployeeView() {
                             {feedback.fromUser.firstName} {feedback.fromUser.lastName}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(feedback.createdAt), { addSuffix: true })}
+                            {feedback.createdAt && formatDistanceToNow(new Date(feedback.createdAt), { addSuffix: true })}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">

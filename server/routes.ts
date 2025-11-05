@@ -326,11 +326,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (components.timeliness < 70) {
           suggestions.push('Work on meeting deadlines consistently to improve timeliness');
         }
+        if (components.efficiency < 70) {
+          suggestions.push('Improve task efficiency by better estimating and logging time');
+        }
+        if (components.velocity < 70) {
+          suggestions.push('Increase sprint velocity by completing more story points');
+        }
         if (components.collaboration < 70) {
           suggestions.push('Engage more with team members through comments and collaboration');
-        }
-        if (components.feedback < 70) {
-          suggestions.push('Seek more feedback from your manager and peers');
         }
       }
 

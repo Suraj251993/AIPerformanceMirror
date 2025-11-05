@@ -9,14 +9,12 @@ export interface ScoreComponents {
   efficiency: number;
   velocity: number;
   collaboration: number;
-  feedback: number;
   weights: {
     taskCompletion: number;
     timeliness: number;
     efficiency: number;
     velocity: number;
     collaboration: number;
-    feedback: number;
   };
 }
 
@@ -171,26 +169,6 @@ export class ScoringEngine {
     return Math.max(0, collaborationScore);
   }
 
-  /**
-   * Calculate feedback score
-   */
-  static async calculateFeedbackScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
-    const userFeedback = await db
-      .select()
-      .from(feedback)
-      .where(
-        and(
-          eq(feedback.toUserId, userId),
-          gte(feedback.createdAt, startDate),
-          lte(feedback.createdAt, endDate)
-        )
-      );
-
-    if (userFeedback.length === 0) return 75;
-
-    const avgRating = userFeedback.reduce((sum, f) => sum + f.rating, 0) / userFeedback.length;
-    return (avgRating / 5) * 100;
-  }
 
   /**
    * Calculate comprehensive performance score for a user
@@ -205,12 +183,11 @@ export class ScoringEngine {
 
     const weightSettings = await SyncService.getSyncSettings('scoring_weights');
     const weights = weightSettings || {
-      taskCompletion: 30,
-      timeliness: 20,
-      efficiency: 10,
-      velocity: 15,
+      taskCompletion: 35,
+      timeliness: 25,
+      efficiency: 15,
+      velocity: 20,
       collaboration: 5,
-      feedback: 20,
     };
 
     const normalizedWeights = {
@@ -219,7 +196,6 @@ export class ScoringEngine {
       efficiency: weights.efficiency / 100,
       velocity: weights.velocity / 100,
       collaboration: weights.collaboration / 100,
-      feedback: weights.feedback / 100,
     };
 
     const [
@@ -228,14 +204,12 @@ export class ScoringEngine {
       efficiency,
       velocity,
       collaboration,
-      feedbackScore,
     ] = await Promise.all([
       this.calculateTaskCompletionScore(userId, startDate, endDate),
       this.calculateTimelinessScore(userId, startDate, endDate),
       this.calculateEfficiencyScore(userId, startDate, endDate),
       this.calculateVelocityScore(userId, startDate, endDate),
       this.calculateCollaborationScore(userId, startDate, endDate),
-      this.calculateFeedbackScore(userId, startDate, endDate),
     ]);
 
     const components: ScoreComponents = {
@@ -244,7 +218,6 @@ export class ScoringEngine {
       efficiency,
       velocity,
       collaboration,
-      feedback: feedbackScore,
       weights: normalizedWeights,
     };
 
@@ -253,8 +226,7 @@ export class ScoringEngine {
       components.timeliness * normalizedWeights.timeliness +
       components.efficiency * normalizedWeights.efficiency +
       components.velocity * normalizedWeights.velocity +
-      components.collaboration * normalizedWeights.collaboration +
-      components.feedback * normalizedWeights.feedback;
+      components.collaboration * normalizedWeights.collaboration;
 
     return {
       scoreValue: Math.min(100, Math.max(0, scoreValue)),

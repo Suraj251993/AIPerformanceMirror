@@ -429,6 +429,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete user endpoint (HR_ADMIN only)
+  app.delete('/api/users/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = req.user.claims.sub;
+      const user = await db.select().from(users).where(eq(users.id, currentUser)).limit(1).then(r => r[0]);
+      
+      // Only HR_ADMIN can delete users
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden - Only HR Admins can delete users' });
+      }
+
+      const userIdToDelete = req.params.userId;
+
+      // Prevent users from deleting themselves
+      if (userIdToDelete === currentUser) {
+        return res.status(400).json({ message: 'Cannot delete your own account' });
+      }
+
+      // Delete the user (cascading deletes will remove related data)
+      await db.delete(users).where(eq(users.id, userIdToDelete));
+
+      // Create audit log
+      await storage.createAuditLog({
+        userId: currentUser,
+        action: 'delete_user',
+        target: userIdToDelete,
+        details: { deletedBy: currentUser },
+      });
+
+      res.json({ message: 'User deleted successfully' });
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

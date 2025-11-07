@@ -206,7 +206,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(scores)
       .where(eq(scores.userId, userId))
-      .orderBy(desc(scores.date))
+      .orderBy(desc(scores.createdAt))
       .limit(1);
     return score;
   }
@@ -216,7 +216,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(scores)
       .where(eq(scores.userId, userId))
-      .orderBy(desc(scores.date));
+      .orderBy(desc(scores.createdAt));
   }
 
   // Audit log operations

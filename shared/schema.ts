@@ -200,7 +200,7 @@ export const feedback = pgTable("feedback", {
   fromUserId: varchar("from_user_id").notNull().references(() => users.id),
   toUserId: varchar("to_user_id").notNull().references(() => users.id),
   rating: integer("rating").notNull(), // 1-5
-  category: varchar("category").notNull(), // 'communication', 'delivery', 'collaboration'
+  category: text("category").array().notNull(), // Changed to array for multiple categories
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -223,7 +223,7 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({
   createdAt: true,
 }).extend({
   rating: z.number().min(1).max(5),
-  category: z.enum(['communication', 'delivery', 'collaboration']),
+  category: z.array(z.enum(['communication', 'delivery', 'collaboration'])).min(1, "Select at least one category"),
   comment: z.string().min(10, "Comment must be at least 10 characters").max(500),
 });
 

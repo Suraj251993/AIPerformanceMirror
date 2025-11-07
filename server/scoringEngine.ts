@@ -1,77 +1,33 @@
 import { db } from './db.js';
-import { users, tasks, timeLogs, feedback, scores, sprints, sprintItems, taskOwners } from '@shared/schema';
-import { eq, and, gte, lte, sql, desc, or } from 'drizzle-orm';
+import { users, tasks, timeLogs, scores, taskOwners } from '@shared/schema';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { SyncService } from './syncService.js';
 
+/**
+ * Excel-Based Performance Scoring System
+ * All metrics derived from imported Excel data fields only
+ */
 export interface ScoreComponents {
-  taskCompletion: number;
-  timeliness: number;
-  efficiency: number;
-  velocity: number;
-  collaboration: number;
+  taskCompletion: number;      // % of tasks marked as completed (status field)
+  timeliness: number;           // % completed before due date (due_date vs completed_at)
+  efficiency: number;           // Actual vs estimated hours accuracy (work hours vs duration)
+  progressQuality: number;      // Average progress % on active tasks (progress_percentage field)
+  priorityFocus: number;        // Weighted completion by priority (priority field)
   weights: {
     taskCompletion: number;
     timeliness: number;
     efficiency: number;
-    velocity: number;
-    collaboration: number;
+    progressQuality: number;
+    priorityFocus: number;
   };
 }
 
 export class ScoringEngine {
   /**
-   * Calculate sprint velocity score for a user based on real sprint data
-   */
-  static async calculateVelocityScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-
-    const userSprintItems = await db
-      .select()
-      .from(sprintItems)
-      .innerJoin(sprints, eq(sprintItems.sprintId, sprints.id))
-      .where(
-        and(
-          eq(sprintItems.assigneeId, userId),
-          gte(sprints.startDate, startDateStr),
-          lte(sprints.endDate, endDateStr),
-          eq(sprintItems.status, 'completed')
-        )
-      );
-
-    if (userSprintItems.length === 0) {
-      return 75;
-    }
-
-    const totalStoryPoints = userSprintItems.reduce(
-      (sum, item) => sum + (item.sprint_items.storyPoints || 0),
-      0
-    );
-
-    const activeSprints = await db
-      .select()
-      .from(sprints)
-      .where(
-        and(
-          gte(sprints.startDate, startDateStr),
-          lte(sprints.endDate, endDateStr),
-          eq(sprints.status, 'completed')
-        )
-      );
-
-    const sprintsCount = activeSprints.length || 1;
-    const averageVelocity = totalStoryPoints / sprintsCount;
-
-    const velocityScore = Math.min(100, (averageVelocity / 20) * 100);
-
-    return Math.max(0, velocityScore);
-  }
-
-  /**
    * Calculate task completion score (supports multi-owner tasks)
+   * Uses: status field from Excel ('Done', 'Completed', etc.)
    */
   static async calculateTaskCompletionScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
-    // Get tasks where user is an owner (from task_owners table)
     const ownedTasks = await db
       .select({
         task: tasks,
@@ -87,28 +43,28 @@ export class ScoringEngine {
         )
       );
 
-    if (ownedTasks.length === 0) return 75;
+    if (ownedTasks.length === 0) return 70;
 
-    // Calculate weighted completion score based on ownership share
     let totalWeightedScore = 0;
     let totalWeight = 0;
 
     for (const { task, ownership } of ownedTasks) {
       const shareWeight = (ownership.sharePercentage || 100) / 100;
-      const isCompleted = task.status === 'completed' ? 1 : 0;
+      // Excel uses 'Done' or 'Completed' status
+      const isCompleted = (task.status === 'completed' || task.status === 'Done') ? 1 : 0;
       
       totalWeightedScore += isCompleted * shareWeight;
       totalWeight += shareWeight;
     }
 
-    return totalWeight > 0 ? (totalWeightedScore / totalWeight) * 100 : 75;
+    return totalWeight > 0 ? (totalWeightedScore / totalWeight) * 100 : 70;
   }
 
   /**
    * Calculate timeliness score (on-time task completion, supports multi-owner tasks)
+   * Uses: due_date and completed_at fields from Excel (Completion Date vs Due Date)
    */
   static async calculateTimelinessScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
-    // Get completed tasks where user is an owner
     const completedTasks = await db
       .select({
         task: tasks,
@@ -119,23 +75,34 @@ export class ScoringEngine {
       .where(
         and(
           eq(taskOwners.userId, userId),
-          eq(tasks.status, 'completed'),
+          sql`${tasks.status} IN ('completed', 'Done')`,
           gte(tasks.createdAt, startDate),
           lte(tasks.createdAt, endDate)
         )
       );
 
-    if (completedTasks.length === 0) return 75;
+    if (completedTasks.length === 0) return 70;
 
-    const onTimeTasks = completedTasks.filter(
-      ({ task }) => task.completedAt && task.dueDate && new Date(task.completedAt) <= new Date(task.dueDate)
-    ).length;
+    let totalWeightedOnTime = 0;
+    let totalWeight = 0;
 
-    return (onTimeTasks / completedTasks.length) * 100;
+    for (const { task, ownership } of completedTasks) {
+      if (!task.completedAt || !task.dueDate) continue;
+      
+      const shareWeight = (ownership.sharePercentage || 100) / 100;
+      const isOnTime = new Date(task.completedAt) <= new Date(task.dueDate) ? 1 : 0;
+      
+      totalWeightedOnTime += isOnTime * shareWeight;
+      totalWeight += shareWeight;
+    }
+
+    return totalWeight > 0 ? (totalWeightedOnTime / totalWeight) * 100 : 70;
   }
 
   /**
-   * Calculate efficiency score (time logged vs estimated, supports multi-owner tasks)
+   * Calculate efficiency score (actual vs estimated hours accuracy)
+   * Uses: estimated_hours (Duration) and time_logs (Work hours) from Excel
+   * Optimal score when actual hours closely match estimated (ratio near 1.0)
    */
   static async calculateEfficiencyScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
     const userTimeLogs = await db
@@ -149,7 +116,6 @@ export class ScoringEngine {
         )
       );
 
-    // Get tasks where user is an owner
     const userTasks = await db
       .select({
         task: tasks,
@@ -165,47 +131,143 @@ export class ScoringEngine {
         )
       );
 
-    if (userTasks.length === 0) return 80;
+    if (userTasks.length === 0 || userTimeLogs.length === 0) return 70;
 
-    // Calculate estimated hours weighted by ownership share
-    const totalEstimated = userTasks.reduce(
+    // Calculate weighted estimated hours based on ownership share
+    const totalEstimatedMinutes = userTasks.reduce(
       (sum, { task, ownership }) => {
         const shareWeight = (ownership.sharePercentage || 100) / 100;
-        return sum + ((task.estimatedHours || 0) * shareWeight);
+        return sum + ((task.estimatedHours || 0) * 60 * shareWeight);
       },
       0
-    ) * 60;
+    );
     
-    const totalLogged = userTimeLogs.reduce((sum, tl) => sum + tl.minutes, 0);
+    const totalLoggedMinutes = userTimeLogs.reduce((sum, tl) => sum + tl.minutes, 0);
 
-    if (totalEstimated === 0 || totalLogged === 0) return 80;
+    if (totalEstimatedMinutes === 0 || totalLoggedMinutes === 0) return 70;
 
-    const efficiency = (totalEstimated / totalLogged) * 100;
-    return Math.min(100, Math.max(0, efficiency));
+    // Calculate ratio: closer to 1.0 is better (accurate estimation)
+    const ratio = totalLoggedMinutes / totalEstimatedMinutes;
+    
+    // Score peaks at 100 when ratio is 1.0, decreases as it deviates
+    // Range: 0.5-1.5 gives decent scores, beyond that penalties increase
+    let efficiencyScore: number;
+    if (ratio >= 0.8 && ratio <= 1.2) {
+      efficiencyScore = 100; // Excellent: within 20% of estimate
+    } else if (ratio >= 0.6 && ratio <= 1.5) {
+      efficiencyScore = 85; // Good: within reasonable range
+    } else if (ratio >= 0.4 && ratio <= 2.0) {
+      efficiencyScore = 65; // Fair: some deviation
+    } else {
+      efficiencyScore = 40; // Poor: significant deviation
+    }
+
+    return efficiencyScore;
   }
 
   /**
-   * Calculate collaboration score based on activity
+   * Calculate progress quality score (how well users maintain task progress tracking)
+   * Uses: progress_percentage field from Excel (% Completed)
+   * Higher average progress on active tasks = better score
    */
-  static async calculateCollaborationScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
-    const userTimeLogs = await db
-      .select()
-      .from(timeLogs)
+  static async calculateProgressQualityScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
+    const activeTasks = await db
+      .select({
+        task: tasks,
+        ownership: taskOwners,
+      })
+      .from(taskOwners)
+      .innerJoin(tasks, eq(taskOwners.taskId, tasks.id))
       .where(
         and(
-          eq(timeLogs.userId, userId),
-          gte(timeLogs.loggedAt, startDate),
-          lte(timeLogs.loggedAt, endDate)
+          eq(taskOwners.userId, userId),
+          sql`${tasks.status} NOT IN ('completed', 'Done')`, // Active tasks only
+          gte(tasks.createdAt, startDate),
+          lte(tasks.createdAt, endDate)
         )
       );
 
-    const collaborationScore = Math.min(100, userTimeLogs.length * 5);
-    return Math.max(0, collaborationScore);
+    if (activeTasks.length === 0) {
+      // No active tasks means either all completed (good) or no tasks (neutral)
+      const anyTasks = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(taskOwners)
+        .where(eq(taskOwners.userId, userId));
+      
+      return anyTasks[0]?.count > 0 ? 90 : 70; // 90 if has completed tasks, 70 if new user
+    }
+
+    let totalWeightedProgress = 0;
+    let totalWeight = 0;
+
+    for (const { task, ownership } of activeTasks) {
+      const shareWeight = (ownership.sharePercentage || 100) / 100;
+      const progress = task.progressPercentage || 0;
+      
+      totalWeightedProgress += progress * shareWeight;
+      totalWeight += shareWeight;
+    }
+
+    const avgProgress = totalWeight > 0 ? totalWeightedProgress / totalWeight : 0;
+    
+    // Convert average progress (0-100%) directly to score
+    // Active tasks with high progress indicate good tracking
+    return Math.min(100, Math.max(0, avgProgress));
+  }
+
+  /**
+   * Calculate priority focus score (weighted completion by task priority)
+   * Uses: priority field from Excel ('High', 'Medium', 'Low')
+   * Completing high-priority tasks weighs more than low-priority
+   */
+  static async calculatePriorityFocusScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
+    const ownedTasks = await db
+      .select({
+        task: tasks,
+        ownership: taskOwners,
+      })
+      .from(taskOwners)
+      .innerJoin(tasks, eq(taskOwners.taskId, tasks.id))
+      .where(
+        and(
+          eq(taskOwners.userId, userId),
+          gte(tasks.createdAt, startDate),
+          lte(tasks.createdAt, endDate)
+        )
+      );
+
+    if (ownedTasks.length === 0) return 70;
+
+    // Priority weights: High = 3x, Medium = 2x, Low = 1x
+    const getPriorityWeight = (priority: string | null): number => {
+      if (!priority) return 1;
+      const p = priority.toLowerCase();
+      if (p === 'high') return 3;
+      if (p === 'medium') return 2;
+      return 1; // Low or unspecified
+    };
+
+    let totalWeightedScore = 0;
+    let totalMaxPossible = 0;
+
+    for (const { task, ownership } of ownedTasks) {
+      const shareWeight = (ownership.sharePercentage || 100) / 100;
+      const priorityWeight = getPriorityWeight(task.priority);
+      const isCompleted = (task.status === 'completed' || task.status === 'Done') ? 1 : 0;
+      
+      totalWeightedScore += isCompleted * priorityWeight * shareWeight;
+      totalMaxPossible += priorityWeight * shareWeight;
+    }
+
+    return totalMaxPossible > 0 
+      ? (totalWeightedScore / totalMaxPossible) * 100 
+      : 70;
   }
 
 
   /**
    * Calculate comprehensive performance score for a user
+   * Uses only Excel-based metrics derived from imported data
    */
   static async calculateUserScore(userId: string, date: Date = new Date()): Promise<{
     scoreValue: number;
@@ -215,43 +277,44 @@ export class ScoringEngine {
     const startDate = new Date(date);
     startDate.setDate(startDate.getDate() - 30);
 
+    // New Excel-based weight distribution
     const weightSettings = await SyncService.getSyncSettings('scoring_weights');
     const weights = weightSettings || {
-      taskCompletion: 35,
-      timeliness: 25,
-      efficiency: 15,
-      velocity: 20,
-      collaboration: 5,
+      taskCompletion: 30,     // Excel: Status field
+      timeliness: 25,         // Excel: Completion Date vs Due Date
+      efficiency: 25,         // Excel: Work hours vs Duration
+      progressQuality: 15,    // Excel: % Completed on active tasks
+      priorityFocus: 5,       // Excel: Priority field (High/Medium/Low)
     };
 
     const normalizedWeights = {
       taskCompletion: weights.taskCompletion / 100,
       timeliness: weights.timeliness / 100,
       efficiency: weights.efficiency / 100,
-      velocity: weights.velocity / 100,
-      collaboration: weights.collaboration / 100,
+      progressQuality: weights.progressQuality / 100,
+      priorityFocus: weights.priorityFocus / 100,
     };
 
     const [
       taskCompletion,
       timeliness,
       efficiency,
-      velocity,
-      collaboration,
+      progressQuality,
+      priorityFocus,
     ] = await Promise.all([
       this.calculateTaskCompletionScore(userId, startDate, endDate),
       this.calculateTimelinessScore(userId, startDate, endDate),
       this.calculateEfficiencyScore(userId, startDate, endDate),
-      this.calculateVelocityScore(userId, startDate, endDate),
-      this.calculateCollaborationScore(userId, startDate, endDate),
+      this.calculateProgressQualityScore(userId, startDate, endDate),
+      this.calculatePriorityFocusScore(userId, startDate, endDate),
     ]);
 
     const components: ScoreComponents = {
       taskCompletion,
       timeliness,
       efficiency,
-      velocity,
-      collaboration,
+      progressQuality,
+      priorityFocus,
       weights: normalizedWeights,
     };
 
@@ -259,8 +322,8 @@ export class ScoringEngine {
       components.taskCompletion * normalizedWeights.taskCompletion +
       components.timeliness * normalizedWeights.timeliness +
       components.efficiency * normalizedWeights.efficiency +
-      components.velocity * normalizedWeights.velocity +
-      components.collaboration * normalizedWeights.collaboration;
+      components.progressQuality * normalizedWeights.progressQuality +
+      components.priorityFocus * normalizedWeights.priorityFocus;
 
     return {
       scoreValue: Math.min(100, Math.max(0, scoreValue)),

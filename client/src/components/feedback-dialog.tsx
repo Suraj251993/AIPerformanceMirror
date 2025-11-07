@@ -25,7 +25,7 @@ interface FeedbackDialogProps {
 export function FeedbackDialog({ toUserId, open, onOpenChange }: FeedbackDialogProps) {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
-  const [category, setCategory] = useState<'communication' | 'delivery' | 'collaboration'>('communication');
+  const [categories, setCategories] = useState<Array<'communication' | 'delivery' | 'collaboration'>>([]);
   const [comment, setComment] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -71,8 +71,16 @@ export function FeedbackDialog({ toUserId, open, onOpenChange }: FeedbackDialogP
 
   const resetForm = () => {
     setRating(0);
-    setCategory('communication');
+    setCategories([]);
     setComment('');
+  };
+
+  const toggleCategory = (cat: 'communication' | 'delivery' | 'collaboration') => {
+    setCategories(prev => 
+      prev.includes(cat) 
+        ? prev.filter(c => c !== cat)
+        : [...prev, cat]
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -96,10 +104,19 @@ export function FeedbackDialog({ toUserId, open, onOpenChange }: FeedbackDialogP
       return;
     }
 
+    if (categories.length === 0) {
+      toast({
+        title: "Category required",
+        description: "Please select at least one category.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     mutation.mutate({
       toUserId,
       rating,
-      category,
+      category: categories,
       comment,
     });
   };
@@ -140,16 +157,16 @@ export function FeedbackDialog({ toUserId, open, onOpenChange }: FeedbackDialogP
             </div>
           </div>
 
-          {/* Category */}
+          {/* Category - Multiple Selection */}
           <div className="space-y-2">
-            <Label>Category</Label>
+            <Label>Categories (select one or more)</Label>
             <div className="grid grid-cols-3 gap-2">
               {(['communication', 'delivery', 'collaboration'] as const).map((cat) => (
                 <Button
                   key={cat}
                   type="button"
-                  variant={category === cat ? 'default' : 'outline'}
-                  onClick={() => setCategory(cat)}
+                  variant={categories.includes(cat) ? 'default' : 'outline'}
+                  onClick={() => toggleCategory(cat)}
                   className="capitalize"
                   data-testid={`button-category-${cat}`}
                 >
@@ -157,6 +174,11 @@ export function FeedbackDialog({ toUserId, open, onOpenChange }: FeedbackDialogP
                 </Button>
               ))}
             </div>
+            {categories.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {categories.length} {categories.length === 1 ? 'category' : 'categories'} selected
+              </p>
+            )}
           </div>
 
           {/* Comment */}
@@ -187,7 +209,7 @@ export function FeedbackDialog({ toUserId, open, onOpenChange }: FeedbackDialogP
             </Button>
             <Button
               type="submit"
-              disabled={mutation.isPending || rating === 0 || comment.length < 10}
+              disabled={mutation.isPending || rating === 0 || comment.length < 10 || categories.length === 0}
               data-testid="button-submit-feedback"
             >
               {mutation.isPending ? "Submitting..." : "Submit Feedback"}

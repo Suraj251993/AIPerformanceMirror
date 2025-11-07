@@ -148,9 +148,19 @@ export default function EmployeeView() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={getCategoryColor(feedback.category)}>
-                            {feedback.category}
-                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.isArray(feedback.category) ? (
+                              feedback.category.map((cat) => (
+                                <Badge key={cat} className={getCategoryColor(cat)}>
+                                  {cat}
+                                </Badge>
+                              ))
+                            ) : (
+                              <Badge className={getCategoryColor(feedback.category)}>
+                                {feedback.category}
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
                               <div

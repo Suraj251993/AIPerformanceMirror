@@ -222,7 +222,7 @@ export default function HRDashboard() {
                       <span className="text-sm">{employee.department || 'N/A'}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{employee.role.replace('_', ' ')}</span>
+                      <span className="text-sm">{(employee.role || 'N/A').replace('_', ' ')}</span>
                     </TableCell>
                     <TableCell>
                       <span className="text-lg font-semibold tabular-nums">

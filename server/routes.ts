@@ -178,8 +178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
-      // Get all employees
-      const allEmployees = await storage.getUsersByRole('EMPLOYEE');
+      // Get HR Team users only (all roles: EMPLOYEE, MANAGER, HR_ADMIN)
+      const allUsers = await db.select().from(users).where(eq(users.department, 'HR Team'));
+      const allEmployees = allUsers;
       
       // Get latest scores for all employees
       const employeesWithScores = await Promise.all(

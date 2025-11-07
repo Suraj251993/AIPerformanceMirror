@@ -68,6 +68,9 @@ function Router() {
           </header>
           <main className="flex-1 overflow-y-auto">
             <Switch>
+              {/* Demo role selection - available to all authenticated users */}
+              <Route path="/demo-login" component={DemoLogin} />
+              
               {user?.role === 'HR_ADMIN' && (
                 <>
                   <Route path="/" component={HRDashboard} />

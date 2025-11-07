@@ -10,9 +10,9 @@ The application includes three pre-configured demo accounts for testing differen
 
 | Role | Email | Name | Department | Access Level |
 |------|-------|------|-----------|--------------|
-| **HR Admin** | `hr.demo@company.com` | Sarah Admin | Human Resources | Full system access, user management, settings |
-| **Manager** | `manager.demo@company.com` | Michael Manager | Engineering | Team oversight, employee performance |
-| **Employee** | `employee.demo@company.com` | Emma Developer | Engineering | Personal performance view |
+| **HR Admin** | `hr.demo@company.com` | Meenakshi Dabral | HR Team | Full system access, user management, settings |
+| **Manager** | `manager.demo@company.com` | Meenakshi Dabral | HR Team | Team oversight, employee performance |
+| **Employee** | `employee.demo@company.com` | Jeeveetha P C K | HR Team | Personal performance view |
 
 **How to Use Demo Accounts:**
 1. Sign in using Replit Auth (Google, GitHub, or Email)
@@ -20,7 +20,7 @@ The application includes three pre-configured demo accounts for testing differen
 3. The system automatically assigns the pre-configured role
 4. Each role sees a different dashboard and has different permissions
 
-**Note:** Emma Developer reports to Michael Manager in the organizational hierarchy.
+**Note:** All demo accounts use real employee names from the HR Team database.
 
 ## Recent Changes
 

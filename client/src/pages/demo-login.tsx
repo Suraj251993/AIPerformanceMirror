@@ -110,7 +110,7 @@ export default function DemoLogin() {
     {
       role: 'HR_ADMIN',
       title: 'HR Administrator',
-      name: 'Sarah Admin',
+      name: 'Meenakshi Dabral',
       description: 'Full system access with organization-wide visibility and control.',
       icon: <Shield className="h-6 w-6 text-red-600" />,
       color: 'bg-red-600',
@@ -125,7 +125,7 @@ export default function DemoLogin() {
     {
       role: 'MANAGER',
       title: 'Manager',
-      name: 'Michael Manager',
+      name: 'Meenakshi Dabral',
       description: 'Team oversight with ability to track and guide team performance.',
       icon: <Users className="h-6 w-6 text-blue-600" />,
       color: 'bg-blue-600',
@@ -140,7 +140,7 @@ export default function DemoLogin() {
     {
       role: 'EMPLOYEE',
       title: 'Employee',
-      name: 'Emma Developer',
+      name: 'Jeeveetha P C K',
       description: 'Personal performance tracking and development insights.',
       icon: <User className="h-6 w-6 text-green-600" />,
       color: 'bg-green-600',

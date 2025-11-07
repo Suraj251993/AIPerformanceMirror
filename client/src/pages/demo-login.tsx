@@ -165,8 +165,8 @@ export default function DemoLogin() {
           <h1 className="text-4xl font-bold text-white mb-3">AI Performance Mirror</h1>
           <p className="text-blue-200 text-lg mb-2">Select Your Demo Role</p>
           <p className="text-blue-300 text-sm max-w-2xl mx-auto">
-            Choose a role to explore the application. Each role provides a different experience
-            with specific permissions and access levels.
+            Choose a role to explore the application with real employee data. Each role shows 
+            actual performance metrics and insights from the HR Team database.
           </p>
         </motion.div>
 
@@ -187,7 +187,7 @@ export default function DemoLogin() {
           transition={{ delay: 0.3 }}
           className="text-center mt-8 text-blue-200 text-sm"
         >
-          This is a demo environment. All data is simulated for demonstration purposes.
+          You'll be logged in as a real employee with actual performance data from the HR Team database.
         </motion.p>
       </div>
     </div>

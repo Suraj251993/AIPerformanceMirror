@@ -24,6 +24,29 @@ The application includes three pre-configured demo accounts for testing differen
 
 ## Recent Changes
 
+**November 7, 2025**
+- ✅ Redesigned Scoring System to Use Excel-Only Fields
+  - Completely rewrote scoring engine to use 5 Excel-based components:
+    1. Task Completion (30%) - % of tasks with status "completed"/"Done"
+    2. Timeliness (25%) - % completed before due date
+    3. Efficiency (25%) - Actual vs estimated hours accuracy
+    4. Progress Quality (15%) - Average progress on active tasks
+    5. Priority Focus (5%) - Weighted by task priority
+  - Removed Sprint Velocity (required Zoho Sprints data)
+  - Removed Collaboration (required activity_events)
+  - Updated all UI components and improvement suggestions
+- ✅ Removed All Non-HR Team Data
+  - Deleted 40 non-HR Team employees (Engineering, Sales, Marketing, Finance, Product, Human Resources departments)
+  - Cleaned up 482 orphaned tasks and 16 orphaned projects
+  - System now contains ONLY 22 HR Team employees (19 from Excel + 3 demo accounts)
+  - Regenerated all scores using new Excel-based system (100% coverage)
+- ✅ Critical Bug Fixes
+  - Fixed HR dashboard to filter by department='HR Team' (not role-based)
+  - Added null role handling to prevent crashes: `(employee.role || 'N/A').replace('_', ' ')`
+  - Added /demo-login route for role switching
+  - Fixed demo account IDs (demo-hr-admin, demo-manager, demo-employee)
+  - Database cleanup: removed 4 auto-created OIDC test users
+
 **November 5, 2025**
 - ✅ Removed Feedback Score Component
   - Eliminated feedback score from scoring engine calculations

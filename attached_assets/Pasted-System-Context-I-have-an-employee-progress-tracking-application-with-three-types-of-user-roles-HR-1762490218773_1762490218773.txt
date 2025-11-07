@@ -1,0 +1,190 @@
+System Context:
+I have an employee progress tracking application with three types of user roles:
+
+HR – Access to all employees’ day-to-day activities.
+
+Project Manager/Product Manager – Access to their own team members only.
+
+Employee – Access to their own daily task progress and status.
+
+Objective:
+Integrate and align the provided dataset with the application’s data model to visualize realistic performance and progress dashboards for each user type.
+
+Dataset Columns:
+
+Task Name
+
+Associated Team
+
+Owner
+
+Custom Status
+
+Tags
+
+Start Date
+
+Due Date
+
+Duration
+
+Priority
+
+Created By
+
+% Completed
+
+Completion Date
+
+Work Hours
+
+Billing Type
+
+Instructions for the AI Builder:
+
+1. Schema Alignment
+
+Map the dataset fields to the app’s internal data entities as follows:
+
+Task Name → Task_Title
+
+Associated Team → Team_Name
+
+Owner → Employee_Name(s) / Employee_ID(s)
+
+Custom Status → Task_Status
+
+Tags → Task_Tags
+
+Start Date → Task_Start_Date
+
+Due Date → Task_End_Date
+
+Duration → Estimated_Duration (days or hours)
+
+Priority → Task_Priority
+
+Created By → Created_By_User
+
+% Completed → Progress_Percentage
+
+Completion Date → Task_Completion_Date
+
+Work Hours → Actual_Worked_Hours
+
+Billing Type → Billing_Category
+
+2. Access Logic
+
+HR View:
+
+Access all data across teams and projects.
+
+Filters: Employee, Team, Project, Date Range.
+
+Project Manager View:
+
+Access limited to their assigned Associated Team.
+
+Dashboard: Team progress summary, overdue tasks, and average performance score.
+
+Employee View:
+
+View only records where the logged-in user is listed as Owner (even if multiple owners exist).
+
+Dashboard:
+
+Individual progress (based on tasks owned or co-owned).
+
+Completion status, work hours, and recent task activity.
+
+3. Group Ownership Logic
+
+Allow the Owner field to contain multiple users (group of people) for shared tasks.
+
+The system should:
+
+Split group tasks internally so each member gets an individual performance record.
+
+Track each person’s contribution through metrics like:
+
+Individual work hours
+
+Subtask completion status
+
+% Completed (individual vs collective)
+
+Calculate individual performance scores by factoring in:
+
+Task weight (priority or duration)
+
+Share of work hours contributed
+
+Timeliness (based on due vs completion date)
+
+Reflect this data on both HR and PM dashboards for evaluation.
+
+4. Visualization Requirements
+
+HR Dashboard: Organization-wide overview
+
+Task completion rate trends
+
+Top-performing employees
+
+Overdue vs completed tasks
+
+Team comparison chart
+
+Project Manager Dashboard:
+
+Team performance summary
+
+Individual member contribution
+
+Upcoming deadlines
+
+Total work hours & average progress %
+
+Employee Dashboard:
+
+Personal progress bar
+
+List of assigned and co-owned tasks
+
+Task completion trend chart
+
+Work hours logged vs estimated duration
+
+5. Data Simulation
+
+Fill missing values with realistic defaults.
+
+Use Start Date, Due Date, and % Completed to compute live task progress.
+
+Flag overdue tasks automatically (Current Date > Due Date & % Completed < 100).
+
+6. Validation
+
+Ensure all date formats follow ISO standard (YYYY-MM-DD).
+
+Verify that team and ownership mappings are correct.
+
+Validate that group tasks still contribute to individual performance tracking.
+
+7. Demo Readiness
+
+Create mock login states for HR, Project Manager, and Employee.
+
+Simulate dashboards using this dataset.
+
+Confirm smooth navigation between user types and accurate data filtering.
+
+✅ Outcome Expected:
+A working demo where:
+
+Each user role sees filtered and relevant dashboards.
+
+Group-owned tasks still feed into each employee’s personal performance score.
+
+HR and PM dashboards reflect combined and individual productivity metrics accurately.

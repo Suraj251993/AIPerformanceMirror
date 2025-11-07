@@ -1,6 +1,6 @@
 import { db } from './db.js';
-import { users, tasks, timeLogs, feedback, scores, sprints, sprintItems } from '@shared/schema';
-import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
+import { users, tasks, timeLogs, feedback, scores, sprints, sprintItems, taskOwners } from '@shared/schema';
+import { eq, and, gte, lte, sql, desc, or } from 'drizzle-orm';
 import { SyncService } from './syncService.js';
 
 export interface ScoreComponents {
@@ -68,36 +68,57 @@ export class ScoringEngine {
   }
 
   /**
-   * Calculate task completion score
+   * Calculate task completion score (supports multi-owner tasks)
    */
   static async calculateTaskCompletionScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
-    const userTasks = await db
-      .select()
-      .from(tasks)
+    // Get tasks where user is an owner (from task_owners table)
+    const ownedTasks = await db
+      .select({
+        task: tasks,
+        ownership: taskOwners,
+      })
+      .from(taskOwners)
+      .innerJoin(tasks, eq(taskOwners.taskId, tasks.id))
       .where(
         and(
-          eq(tasks.assigneeId, userId),
+          eq(taskOwners.userId, userId),
           gte(tasks.createdAt, startDate),
           lte(tasks.createdAt, endDate)
         )
       );
 
-    if (userTasks.length === 0) return 75;
+    if (ownedTasks.length === 0) return 75;
 
-    const completedTasks = userTasks.filter(t => t.status === 'completed').length;
-    return (completedTasks / userTasks.length) * 100;
+    // Calculate weighted completion score based on ownership share
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+
+    for (const { task, ownership } of ownedTasks) {
+      const shareWeight = (ownership.sharePercentage || 100) / 100;
+      const isCompleted = task.status === 'completed' ? 1 : 0;
+      
+      totalWeightedScore += isCompleted * shareWeight;
+      totalWeight += shareWeight;
+    }
+
+    return totalWeight > 0 ? (totalWeightedScore / totalWeight) * 100 : 75;
   }
 
   /**
-   * Calculate timeliness score (on-time task completion)
+   * Calculate timeliness score (on-time task completion, supports multi-owner tasks)
    */
   static async calculateTimelinessScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
+    // Get completed tasks where user is an owner
     const completedTasks = await db
-      .select()
-      .from(tasks)
+      .select({
+        task: tasks,
+        ownership: taskOwners,
+      })
+      .from(taskOwners)
+      .innerJoin(tasks, eq(taskOwners.taskId, tasks.id))
       .where(
         and(
-          eq(tasks.assigneeId, userId),
+          eq(taskOwners.userId, userId),
           eq(tasks.status, 'completed'),
           gte(tasks.createdAt, startDate),
           lte(tasks.createdAt, endDate)
@@ -107,14 +128,14 @@ export class ScoringEngine {
     if (completedTasks.length === 0) return 75;
 
     const onTimeTasks = completedTasks.filter(
-      t => t.completedAt && t.dueDate && new Date(t.completedAt) <= new Date(t.dueDate)
+      ({ task }) => task.completedAt && task.dueDate && new Date(task.completedAt) <= new Date(task.dueDate)
     ).length;
 
     return (onTimeTasks / completedTasks.length) * 100;
   }
 
   /**
-   * Calculate efficiency score (time logged vs estimated)
+   * Calculate efficiency score (time logged vs estimated, supports multi-owner tasks)
    */
   static async calculateEfficiencyScore(userId: string, startDate: Date, endDate: Date): Promise<number> {
     const userTimeLogs = await db
@@ -128,12 +149,17 @@ export class ScoringEngine {
         )
       );
 
+    // Get tasks where user is an owner
     const userTasks = await db
-      .select()
-      .from(tasks)
+      .select({
+        task: tasks,
+        ownership: taskOwners,
+      })
+      .from(taskOwners)
+      .innerJoin(tasks, eq(taskOwners.taskId, tasks.id))
       .where(
         and(
-          eq(tasks.assigneeId, userId),
+          eq(taskOwners.userId, userId),
           gte(tasks.createdAt, startDate),
           lte(tasks.createdAt, endDate)
         )
@@ -141,7 +167,15 @@ export class ScoringEngine {
 
     if (userTasks.length === 0) return 80;
 
-    const totalEstimated = userTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0) * 60;
+    // Calculate estimated hours weighted by ownership share
+    const totalEstimated = userTasks.reduce(
+      (sum, { task, ownership }) => {
+        const shareWeight = (ownership.sharePercentage || 100) / 100;
+        return sum + ((task.estimatedHours || 0) * shareWeight);
+      },
+      0
+    ) * 60;
+    
     const totalLogged = userTimeLogs.reduce((sum, tl) => sum + tl.minutes, 0);
 
     if (totalEstimated === 0 || totalLogged === 0) return 80;

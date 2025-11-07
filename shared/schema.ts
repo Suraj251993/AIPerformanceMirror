@@ -50,6 +50,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   employees: many(users, { relationName: "manager_employee" }),
   tasks: many(tasks),
+  taskOwnerships: many(taskOwners),
+  createdTasks: many(tasks, { relationName: "task_creator" }),
   timeLogs: many(timeLogs),
   activityEvents: many(activityEvents),
   feedbackGiven: many(feedback, { relationName: "feedback_from" }),
@@ -66,6 +68,7 @@ export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
+  teamName: varchar("team_name"),
   status: varchar("status").notNull().default('active'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -90,7 +93,12 @@ export const tasks = pgTable("tasks", {
   points: integer("points").default(0),
   estimatedHours: real("estimated_hours"),
   dueDate: timestamp("due_date"),
+  startDate: timestamp("start_date"),
   completedAt: timestamp("completed_at"),
+  progressPercentage: integer("progress_percentage").default(0),
+  billingType: varchar("billing_type").default('none'),
+  tags: text("tags").array(),
+  createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -104,11 +112,40 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     fields: [tasks.assigneeId],
     references: [users.id],
   }),
+  creator: one(users, {
+    fields: [tasks.createdBy],
+    references: [users.id],
+    relationName: "task_creator",
+  }),
   timeLogs: many(timeLogs),
+  taskOwners: many(taskOwners),
 }));
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = typeof tasks.$inferInsert;
+
+// Task Owners junction table (for multi-owner/group tasks)
+export const taskOwners = pgTable("task_owners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sharePercentage: integer("share_percentage").default(100), // For calculating individual contribution
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const taskOwnersRelations = relations(taskOwners, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskOwners.taskId],
+    references: [tasks.id],
+  }),
+  user: one(users, {
+    fields: [taskOwners.userId],
+    references: [users.id],
+  }),
+}));
+
+export type TaskOwner = typeof taskOwners.$inferSelect;
+export type InsertTaskOwner = typeof taskOwners.$inferInsert;
 
 // Time logs table
 export const timeLogs = pgTable("time_logs", {

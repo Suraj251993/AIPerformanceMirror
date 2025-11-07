@@ -433,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/users/:userId', isAuthenticated, async (req: any, res) => {
     try {
       const currentUser = req.user.claims.sub;
-      const user = await db.select().from(users).where(eq(users.id, currentUser)).limit(1).then(r => r[0]);
+      const user = await storage.getUser(currentUser);
       
       // Only HR_ADMIN can delete users
       if (user?.role !== 'HR_ADMIN') {

@@ -18,8 +18,10 @@ import { ScoreCircle } from "@/components/score-circle";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { ScoreDetailsModal } from "@/components/score-details-modal";
+import { FeedbackDialog } from "@/components/feedback-dialog";
 import { GridBackground } from "@/components/grid-background";
 import type { User, Score } from "@shared/schema";
+import { MessageSquare } from "lucide-react";
 
 interface DashboardData {
   kpis: {
@@ -34,6 +36,7 @@ interface DashboardData {
 
 export default function HRDashboard() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [feedbackUserId, setFeedbackUserId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard/hr"],
@@ -237,14 +240,25 @@ export default function HRDashboard() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedUserId(employee.id)}
-                        data-testid={`button-view-details-${employee.id}`}
-                      >
-                        View Details
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setFeedbackUserId(employee.id)}
+                          data-testid={`button-give-feedback-${employee.id}`}
+                        >
+                          <MessageSquare className="w-4 h-4 mr-1" />
+                          Give Feedback
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedUserId(employee.id)}
+                          data-testid={`button-view-details-${employee.id}`}
+                        >
+                          View Details
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -259,6 +273,14 @@ export default function HRDashboard() {
           userId={selectedUserId}
           open={!!selectedUserId}
           onOpenChange={(open) => !open && setSelectedUserId(null)}
+        />
+      )}
+
+      {feedbackUserId && (
+        <FeedbackDialog
+          toUserId={feedbackUserId}
+          open={!!feedbackUserId}
+          onOpenChange={(open) => !open && setFeedbackUserId(null)}
         />
       )}
     </div>

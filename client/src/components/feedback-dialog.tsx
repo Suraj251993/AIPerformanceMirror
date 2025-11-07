@@ -44,7 +44,10 @@ export function FeedbackDialog({ toUserId, open, onOpenChange }: FeedbackDialogP
         title: "Feedback submitted",
         description: "Your feedback has been recorded successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      // Invalidate all dashboard queries to refresh feedback display
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/hr"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/employee"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/manager"] });
       queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
       onOpenChange(false);
       resetForm();

@@ -221,6 +221,7 @@ export const feedbackRelations = relations(feedback, ({ one }) => ({
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({
   id: true,
   createdAt: true,
+  fromUserId: true, // Omitted because it's populated server-side from session
 }).extend({
   rating: z.number().min(1).max(5),
   category: z.array(z.enum(['communication', 'delivery', 'collaboration'])).min(1, "Select at least one category"),

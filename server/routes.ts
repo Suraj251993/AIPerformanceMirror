@@ -406,7 +406,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create feedback endpoint
   app.post('/api/feedback', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const user = await getCurrentUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
       
       // Validate request body
       const validatedData = insertFeedbackSchema.parse(req.body);
@@ -414,12 +417,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create feedback with fromUserId
       const newFeedback = await storage.createFeedback({
         ...validatedData,
-        fromUserId: userId,
+        fromUserId: user.id,
       });
 
       // Create audit log
       await storage.createAuditLog({
-        userId,
+        userId: user.id,
         action: 'create_feedback',
         target: validatedData.toUserId,
         details: { rating: validatedData.rating, category: validatedData.category },

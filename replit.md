@@ -2,89 +2,7 @@
 
 ## Overview
 
-AI Performance Mirror is an enterprise employee performance analytics application that integrates with Zoho Projects and Zoho Sprints to provide real-time performance tracking and insights. The application serves three distinct user roles: HR Administrators (organization-wide visibility), Managers (team oversight), and Employees (personal performance views). The system computes AI-driven performance scores based on task completion, timeliness, collaboration, feedback, and other metrics, presenting them through data-rich dashboards with 3D visualizations.
-
-## Demo Accounts
-
-The application includes three pre-configured demo accounts for testing different role levels:
-
-| Role | Email | Name | Department | Access Level |
-|------|-------|------|-----------|--------------|
-| **HR Admin** | `hr.demo@company.com` | Meenakshi Dabral | HR Team | Full system access, user management, settings |
-| **Manager** | `manager.demo@company.com` | Meenakshi Dabral | HR Team | Team oversight, employee performance |
-| **Employee** | `employee.demo@company.com` | Jeeveetha P C K | HR Team | Personal performance view |
-
-**How to Use Demo Accounts:**
-1. Sign in using Replit Auth (Google, GitHub, or Email)
-2. When prompted, use one of the demo email addresses above
-3. The system automatically assigns the pre-configured role
-4. Each role sees a different dashboard and has different permissions
-
-**Note:** All demo accounts use real employee names from the HR Team database.
-
-## Recent Changes
-
-**November 7, 2025**
-- ✅ Redesigned Scoring System to Use Excel-Only Fields
-  - Completely rewrote scoring engine to use 5 Excel-based components:
-    1. Task Completion (30%) - % of tasks with status "completed"/"Done"
-    2. Timeliness (25%) - % completed before due date
-    3. Efficiency (25%) - Actual vs estimated hours accuracy
-    4. Progress Quality (15%) - Average progress on active tasks
-    5. Priority Focus (5%) - Weighted by task priority
-  - Removed Sprint Velocity (required Zoho Sprints data)
-  - Removed Collaboration (required activity_events)
-  - Updated all UI components and improvement suggestions
-- ✅ Removed All Non-HR Team Data
-  - Deleted 40 non-HR Team employees (Engineering, Sales, Marketing, Finance, Product, Human Resources departments)
-  - Cleaned up 482 orphaned tasks and 16 orphaned projects
-  - System now contains ONLY 22 HR Team employees (19 from Excel + 3 demo accounts)
-  - Regenerated all scores using new Excel-based system (100% coverage)
-- ✅ Critical Bug Fixes
-  - Fixed HR dashboard to filter by department='HR Team' (not role-based)
-  - Added null role handling to prevent crashes: `(employee.role || 'N/A').replace('_', ' ')`
-  - Added /demo-login route for role switching
-  - Fixed demo account IDs (demo-hr-admin, demo-manager, demo-employee)
-  - Database cleanup: removed 4 auto-created OIDC test users
-
-**November 5, 2025**
-- ✅ Removed Feedback Score Component
-  - Eliminated feedback score from scoring engine calculations
-  - Updated default weight distribution (taskCompletion 35%, timeliness 25%, efficiency 15%, velocity 20%, collaboration 5%)
-  - Removed feedback display from score details modal and all dashboards
-  - Updated improvement suggestions to focus on remaining performance metrics
-  - Cleaned up shared schema and type definitions
-
-**October 24, 2025**
-- ✅ Implemented Demo Login System
-  - Created role selection page with 3 cards (HR Admin, Manager, Employee)
-  - Added backend API endpoint `/api/demo/set-role` to store role in session
-  - Updated auth middleware to return demo user based on session role
-  - Modified App.tsx routing to show demo login after authentication
-  - Cleaned up database, keeping only 3 demo accounts
-  - Users can now sign in once and test all 3 roles without multiple auth flows
-  - **Fixed dashboard endpoints** to respect demo mode and show real data
-- ✅ Added 30 Sample Employees
-  - 6 departments: Engineering, Sales, Marketing, Finance, Product, HR
-  - 6 active projects with 20 tasks
-  - Performance scores distributed realistically (65-95 range)
-  - 18 time logs and 10 feedback entries
-  - All dashboards now display production-like data
-- ✅ Completed Task 6: Automated Email Reporting System
-  - Implemented email service with SMTP integration and retry logic
-  - Added database schema for report subscriptions and delivery logs
-  - Built HTML email template generator for daily and weekly performance reports
-  - Integrated configurable email schedulers with dynamic cron expressions
-  - Created HR Admin-only Email Reports UI in Settings page with subscription management, test emails, schedule configuration, and delivery history
-  - All email report features restricted to HR_ADMIN role with proper query gating and API authorization
-
-- ✅ Completed Task 7: Enhanced 3D Visualizations
-  - **Background Elements**: Created AnimatedBackground (floating particles) and GridBackground (SVG grid with animated orbs) components for dashboard headers
-  - **Score Visualization**: Enhanced ScoreCircle with layered SVG rings, gradients, glow effects (HSLA with 20% alpha), and celebration particles for scores >= 90
-  - **KPI Cards**: Added 3D extruded layers with translateZ transforms, perspective transforms on hover (rotateY/rotateX), floating effects, and enhanced glassmorphism
-  - **Chart Enhancements**: Upgraded LineChart to AreaChart with gradient fills, SVG glow filters, enhanced tooltips with backdrop blur and score-based coloring
-  - **Dashboard Polish**: Manager alert panel with pulsing indicator, floating cards, side accent bars with glow, and animated particles for warnings
-  - All 3D effects implemented using CSS transforms and Framer Motion (no heavy Three.js), ensuring high performance on mid-tier devices
+AI Performance Mirror is an enterprise employee performance analytics application designed to integrate with Zoho Projects and Zoho Sprints. It provides real-time performance tracking and AI-driven insights for HR Administrators, Managers, and Employees. The system calculates performance scores based on task completion, timeliness, efficiency, and priority focus, visualized through data-rich dashboards with 3D elements. The application aims to enhance employee performance visibility and drive productivity within organizations.
 
 ## User Preferences
 
@@ -94,148 +12,33 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-**Framework & Build System**
-- React with TypeScript using Vite as the build tool
-- Single-page application (SPA) architecture with client-side routing via Wouter
-- Component-based architecture using functional components with hooks
-
-**UI Design System**
-- Shadcn/ui component library (New York style variant) with Radix UI primitives
-- Tailwind CSS for styling with custom design tokens
-- Dark/light theme support with system preference detection
-- Custom color palette featuring dark blues (#0B1F3A, #123B6A, #1E6FB8) for a professional data analytics aesthetic
-- 3D elements using Framer Motion for animations (subtle depth layering, glassmorphism, floating card effects)
-- Typography: Inter font family with tabular numerics for data-dense displays
-
-**State Management**
-- TanStack Query (React Query) for server state management and caching
-- Query-based data fetching with automatic refetching disabled (staleTime: Infinity)
-- React Context for theme and sidebar state management
-- Session-based authentication state through query invalidation
-
-**Key Frontend Patterns**
-- Role-based component rendering based on authenticated user's role (HR_ADMIN, MANAGER, EMPLOYEE)
-- Protected routes requiring authentication via useAuth hook
-- Optimistic UI updates with mutation callbacks
-- Responsive design with mobile/desktop breakpoints
+The frontend is a React TypeScript SPA using Vite, Wouter for routing, and a component-based structure. It leverages Shadcn/ui (New York style) with Radix UI, Tailwind CSS for styling, and supports dark/light themes. Custom color palettes and typography (Inter font) are used for a professional aesthetic. Framer Motion handles 3D animations and subtle visual effects. State management uses TanStack Query for server state and caching, with React Context for UI state. Key patterns include role-based rendering, protected routes, optimistic UI updates, and responsive design.
 
 ### Backend Architecture
 
-**Server Framework**
-- Express.js with TypeScript running on Node.js
-- ESM (ECMAScript Modules) throughout the codebase
-- Development server with Vite middleware for HMR
-- Production builds using esbuild for server bundling
-
-**Authentication & Session Management**
-- OAuth2-based authentication using OpenID Connect with Replit's authentication service
-- Passport.js strategy for OIDC flow
-- Session storage in PostgreSQL using connect-pg-simple
-- Cookie-based sessions with 1-week TTL
-- Role-based authorization middleware (isAuthenticated)
-
-**API Design**
-- RESTful API structure under `/api` namespace
-- Role-specific endpoints: `/api/dashboard/hr`, `/api/dashboard/manager`, `/api/dashboard/employee`
-- JSON request/response format
-- Request logging middleware for API endpoints
-
-**Data Layer & ORM**
-- Drizzle ORM for type-safe database operations
-- Schema-first design with TypeScript types generated from Drizzle schemas
-- Shared schema definitions between client and server (`@shared/schema`)
-- Migrations managed through Drizzle Kit
-
-**Performance Scoring System**
-The application implements a production-grade scoring engine (`server/scoringEngine.ts`) with real data integration:
-- **Task Completion**: Percentage of tasks completed by the user
-- **Timeliness**: On-time completion rate (completed before due date)
-- **Efficiency**: Time logged vs. estimated hours ratio
-- **Sprint Velocity**: Real story points completed from Zoho Sprints data (replaces mock calculations)
-- **Collaboration**: Activity-based metrics (time logs, interactions)
-
-**Scoring Engine Features:**
-- Uses configurable weights from `sync_settings` (default: taskCompletion 35%, timeliness 25%, efficiency 15%, velocity 20%, collaboration 5%)
-- `calculateVelocityScore()`: Queries actual sprint data, sums story points completed, calculates average velocity across completed sprints
-- `calculateUserScore()`: Orchestrates all components, applies weights, returns 0-100 score with detailed breakdown
-- `generateAllScores()`: Batch processing for all employees with automatic daily score persistence
-- Scores stored in `scores` table with JSONB component breakdown for flexibility and historical tracking
+The backend is built with Express.js and TypeScript on Node.js, utilizing ESM. Authentication is OAuth2-based using OpenID Connect with Replit's service and Passport.js, storing sessions in PostgreSQL. The API is RESTful, under `/api`, with role-specific endpoints and JSON format. Drizzle ORM provides type-safe database operations, with shared schemas between client and server. The core is a performance scoring system (`server/scoringEngine.ts`) calculating scores based on Task Completion, Timeliness, Efficiency, and Priority Focus, using configurable weights and storing historical scores.
 
 ### Database Schema
 
-**Core Tables**
-- `users`: Employee records with role assignment (HR_ADMIN, MANAGER, EMPLOYEE), department, and manager hierarchy
-- `sessions`: Session storage for authentication (required for Replit Auth)
-- `projects`: Project information synced from Zoho Projects
-- `tasks`: Individual tasks with status, priority, assignee, and time tracking
-- `time_logs`: Detailed time entries for tasks
-- `activity_events`: Event stream of all user activities (task updates, comments, completions)
-- `feedback`: Peer and manager feedback with ratings and categories
-- `scores`: Computed performance scores with timestamp and component breakdown
-- `audit_logs`: System audit trail for compliance
-- `zoho_connections`: OAuth2 tokens for Zoho integration (userId, accessToken, refreshToken, expiresAt, scope, zohoOrgId)
-- `sync_settings`: Configuration for data sync (scoring weights, polling intervals, retention policies)
-- `sync_logs`: History of sync operations with status and error tracking
-- `sprints`: Sprint metadata from Zoho Sprints (name, startDate, endDate, status, teamId, goals)
-- `sprint_items`: Sprint backlog items with story points, status, assignee, sprint association
+The database includes core tables for `users` (with role, department, manager hierarchy), `sessions`, `projects`, `tasks`, `time_logs`, `activity_events`, `feedback`, `scores` (with JSONB breakdown), `audit_logs`, `zoho_connections`, `sync_settings`, `sync_logs`, `sprints`, and `sprint_items`. Relationships include a self-referential manager-employee hierarchy, one-to-many relationships for users-to-tasks/logs/events, projects-to-tasks, and sprints-to-sprint items, and many-to-many for feedback.
 
-**Schema Relationships**
-- Self-referential manager-employee hierarchy in users table
-- One-to-many: users → tasks, users → time_logs, users → activity_events
-- One-to-many: projects → tasks
-- One-to-many: sprints → sprint_items
-- Many-to-many feedback through from_user_id and to_user_id relationships
-- Sprint items linked to users via assigneeId for velocity tracking
-
-### External Dependencies
+## External Dependencies
 
 **Database**
 - PostgreSQL via Neon serverless driver (`@neondatabase/serverless`)
-- WebSocket support for serverless connections
-- Connection pooling for production environments
 
 **Third-Party Integrations**
-- **Zoho Projects API**: Task and project data ingestion (OAuth2 implemented, production-ready)
-  - API client methods: getProjects(), getTasklists(), getTasks(), getUsers()
-  - Sync service with pagination, rate limiting, error handling
-  - Automated syncing via scheduler
-- **Zoho Sprints API**: Sprint velocity and story point tracking (OAuth2 implemented, production-ready)
-  - API client methods: getSprints(), getSprintItems(), getBacklogItems(), getTeams()
-  - Full sprint metadata and backlog item sync
-  - Real velocity calculations in scoring engine using actual story points completed
-  - Integrated into automated sync pipeline
-- **OAuth2 Flow**: Complete Zoho service authentication with token refresh and secure storage
-- **Sync Scheduler**: Production-ready polling system (`server/scheduler.ts`)
-  - Configurable intervals (default: 60 minutes)
-  - Concurrency protection (prevents overlapping runs)
-  - Reentrancy guards and race condition prevention
-  - Comprehensive error handling and sync logging
-- **Email Reporting System**: Automated performance report delivery (HR Admin only)
-  - `server/emailService.ts`: Nodemailer-based SMTP email service with retry logic
-  - `server/reportGenerator.ts`: HTML email template generator for daily/weekly reports
-  - Database tables: `report_subscriptions`, `report_delivery_log`
-  - Configurable schedules (default: daily 8:00 AM, weekly Monday 8:00 AM)
-  - HR admin UI in Settings page: subscription toggles, test email, schedule config, delivery history
-  - Dynamic cron expressions built from database settings
-  - Production requires SMTP environment variables: SMTP_HOST, SMTP_USER, SMTP_PASSWORD
-- **Webhook Support**: Pending implementation for real-time Zoho updates
+- **Zoho Projects API**: For task and project data ingestion, with OAuth2, pagination, rate limiting, and automated syncing.
+- **Zoho Sprints API**: For sprint velocity and story point tracking, with OAuth2, full sprint metadata, and backlog item sync integrated into the scoring engine.
+- **OAuth2 Flow**: Complete Zoho service authentication with token refresh and secure storage.
+- **Sync Scheduler**: A production-ready polling system (`server/scheduler.ts`) for data synchronization with configurable intervals, concurrency protection, and error handling.
+- **Email Reporting System**: Automated performance report delivery (`server/emailService.ts` using Nodemailer, `server/reportGenerator.ts`) with configurable schedules and HR admin UI.
 
 **Key Libraries**
-- `@tanstack/react-query`: Server state management and caching
+- `@tanstack/react-query`: Server state management
 - `drizzle-orm`: Type-safe database operations
 - `passport` + `openid-client`: OAuth2/OIDC authentication
-- `date-fns`: Date manipulation and formatting
+- `date-fns`: Date manipulation
 - `framer-motion`: Animation and 3D effects
-- `recharts`: Data visualization for charts and graphs
+- `recharts`: Data visualization
 - `react-hook-form` + `zod`: Form handling and validation
-- `papaparse`: CSV parsing for data exports
-
-**Development Tools**
-- TypeScript for static typing across client and server
-- ESLint and Prettier (implicit through Replit configuration)
-- Vite plugins for development experience (@replit/vite-plugin-runtime-error-modal, @replit/vite-plugin-cartographer)
-
-**Hosting & Deployment**
-- Replit for development and initial deployment
-- Environment variables: DATABASE_URL, SESSION_SECRET, REPL_ID, ISSUER_URL
-- Production build creates static assets in `dist/public` and bundled server in `dist/index.js`

@@ -240,8 +240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
-      // Get team members (using demo user ID if in demo mode)
-      const teamMembers = await storage.getUsersByManager(user!.id);
+      // Show all HR Team employees (same as HR admin view)
+      const teamMembers = await db.select().from(users).where(eq(users.department, 'HR Team'));
       
       // Get latest scores for team members
       const teamWithScores = await Promise.all(

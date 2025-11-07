@@ -179,8 +179,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get HR Team users only (all roles: EMPLOYEE, MANAGER, HR_ADMIN)
+      // Filter out demo accounts to avoid duplicates
       const allUsers = await db.select().from(users).where(eq(users.department, 'HR Team'));
-      const allEmployees = allUsers;
+      const allEmployees = allUsers.filter(u => !u.id.startsWith('demo-'));
       
       // Get latest scores for all employees
       const employeesWithScores = await Promise.all(
@@ -241,7 +242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Show all HR Team employees (same as HR admin view)
-      const teamMembers = await db.select().from(users).where(eq(users.department, 'HR Team'));
+      // Filter out demo accounts to avoid duplicates
+      const allTeamMembers = await db.select().from(users).where(eq(users.department, 'HR Team'));
+      const teamMembers = allTeamMembers.filter(u => !u.id.startsWith('demo-'));
       
       // Get latest scores for team members
       const teamWithScores = await Promise.all(

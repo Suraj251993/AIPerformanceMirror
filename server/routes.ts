@@ -5,8 +5,8 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertFeedbackSchema } from "@shared/schema";
 import { seedMockData } from "./mockData";
 import { db } from "./db";
-import { users, feedback as feedbackTable } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, feedback as feedbackTable, tasks, projects } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 import { registerZohoRoutes } from "./zohoRoutes";
 
 // Helper function to get current user (respecting demo mode)
@@ -426,6 +426,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching feedback:", error);
       res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  // Get tasks for a specific user
+  app.get('/api/users/:userId/tasks', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      
+      const userTasks = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+          priority: tasks.priority,
+          startDate: tasks.startDate,
+          dueDate: tasks.dueDate,
+          completedAt: tasks.completedAt,
+          progressPercentage: tasks.progressPercentage,
+          estimatedHours: tasks.estimatedHours,
+          projectName: projects.name,
+        })
+        .from(tasks)
+        .leftJoin(projects, eq(tasks.projectId, projects.id))
+        .where(eq(tasks.assigneeId, userId))
+        .orderBy(desc(tasks.createdAt));
+
+      res.json(userTasks);
+    } catch (error) {
+      console.error("Error fetching user tasks:", error);
+      res.status(500).json({ message: "Failed to fetch user tasks" });
     }
   });
 

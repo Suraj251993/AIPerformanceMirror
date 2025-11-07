@@ -7,10 +7,13 @@ import {
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { ScoreCircle } from "@/components/score-circle";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import type { Score, ScoreComponents, User } from "@shared/schema";
 import { motion } from "framer-motion";
+import { Calendar, CheckCircle2, Clock, Flag } from "lucide-react";
+import { format } from "date-fns";
 
 interface ScoreDetailsModalProps {
   userId: string;
@@ -24,9 +27,28 @@ interface ScoreDetailsData {
   history: Score[];
 }
 
+interface UserTask {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  startDate: Date | null;
+  dueDate: Date | null;
+  completedAt: Date | null;
+  progressPercentage: number | null;
+  estimatedHours: number | null;
+  projectName: string | null;
+}
+
 export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsModalProps) {
   const { data, isLoading } = useQuery<ScoreDetailsData>({
     queryKey: ["/api/scores", userId],
+    enabled: open,
+  });
+
+  const { data: tasks, isLoading: tasksLoading } = useQuery<UserTask[]>({
+    queryKey: ["/api/users", userId, "tasks"],
     enabled: open,
   });
 
@@ -247,6 +269,102 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                 </div>
               </Card>
             )}
+
+            {/* Tasks List */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+            >
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Tasks</h3>
+                {tasksLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-24 bg-muted/20 rounded animate-pulse" />
+                    ))}
+                  </div>
+                ) : tasks && tasks.length > 0 ? (
+                  <div className="space-y-3">
+                    {tasks.map((task, index) => (
+                      <motion.div
+                        key={task.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="border rounded-lg p-4 hover-elevate"
+                        data-testid={`task-${task.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm mb-1">{task.title}</h4>
+                            {task.projectName && (
+                              <p className="text-xs text-muted-foreground">{task.projectName}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Badge 
+                              variant={
+                                task.priority === 'high' ? 'destructive' : 
+                                task.priority === 'medium' ? 'default' : 
+                                'outline'
+                              }
+                              className="text-xs"
+                              data-testid={`task-priority-${task.id}`}
+                            >
+                              <Flag className="w-3 h-3 mr-1" />
+                              {task.priority}
+                            </Badge>
+                            <Badge 
+                              variant={
+                                task.status === 'completed' || task.status === 'Done' ? 'default' : 
+                                task.status === 'in_progress' ? 'outline' : 
+                                'secondary'
+                              }
+                              data-testid={`task-status-${task.id}`}
+                            >
+                              {task.status}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                          {task.startDate && (
+                            <div className="flex items-center gap-1" data-testid={`task-start-date-${task.id}`}>
+                              <Calendar className="w-3 h-3" />
+                              <span>Start: {format(new Date(task.startDate), 'MMM dd, yyyy')}</span>
+                            </div>
+                          )}
+                          {task.dueDate && (
+                            <div className="flex items-center gap-1" data-testid={`task-due-date-${task.id}`}>
+                              <Clock className="w-3 h-3" />
+                              <span>Due: {format(new Date(task.dueDate), 'MMM dd, yyyy')}</span>
+                            </div>
+                          )}
+                          {task.completedAt && (
+                            <div className="flex items-center gap-1 text-green-600 dark:text-green-400" data-testid={`task-completed-date-${task.id}`}>
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Completed: {format(new Date(task.completedAt), 'MMM dd, yyyy')}</span>
+                            </div>
+                          )}
+                          {task.progressPercentage !== null && task.progressPercentage > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span>Progress:</span>
+                              <Progress value={task.progressPercentage} className="h-1 flex-1" />
+                              <span>{task.progressPercentage}%</span>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No tasks assigned to this employee</p>
+                  </div>
+                )}
+              </Card>
+            </motion.div>
           </div>
         )}
       </DialogContent>

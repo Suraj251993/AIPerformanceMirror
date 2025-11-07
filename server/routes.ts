@@ -316,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(feedbackTable.toUserId, user!.id))
         .limit(5);
 
-      // Generate improvement suggestions
+      // Generate improvement suggestions based on Excel-derived score components
       const suggestions: string[] = [];
       if (latestScore) {
         const components = latestScore.components as any;
@@ -327,13 +327,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           suggestions.push('Work on meeting deadlines consistently to improve timeliness');
         }
         if (components.efficiency < 70) {
-          suggestions.push('Improve task efficiency by better estimating and logging time');
+          suggestions.push('Improve estimation accuracy - aim for actual work hours to closely match estimated hours');
         }
-        if (components.velocity < 70) {
-          suggestions.push('Increase sprint velocity by completing more story points');
+        if (components.progressQuality < 70) {
+          suggestions.push('Keep task progress updated regularly - maintain accurate progress percentages on active tasks');
         }
-        if (components.collaboration < 70) {
-          suggestions.push('Engage more with team members through comments and collaboration');
+        if (components.priorityFocus < 70) {
+          suggestions.push('Prioritize high-priority tasks - completing them has greater impact on your score');
         }
       }
 

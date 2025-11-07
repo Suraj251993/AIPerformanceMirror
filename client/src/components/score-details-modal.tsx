@@ -34,8 +34,8 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
     taskCompletion: "Task Completion",
     timeliness: "Timeliness",
     efficiency: "Efficiency",
-    velocity: "Sprint Velocity",
-    collaboration: "Collaboration",
+    progressQuality: "Progress Quality",
+    priorityFocus: "Priority Focus",
   };
 
   return (

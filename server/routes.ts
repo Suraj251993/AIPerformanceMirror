@@ -11,10 +11,14 @@ import { registerZohoRoutes } from "./zohoRoutes";
 
 // Helper function to get current user (respecting demo mode)
 async function getCurrentUser(req: any): Promise<any> {
-  // Check if demo role is set in session (uses real employees)
+  // Check if demo role is set in session
   if (req.session.demoRole && req.session.demoUserId) {
-    // Use the user ID stored in the session during demo mode setup
-    return await storage.getUser(req.session.demoUserId);
+    // Get the user from database but overlay the demo role
+    const user = await storage.getUser(req.session.demoUserId);
+    if (user) {
+      // Return user with demo role overlaid (without mutating database)
+      return { ...user, role: req.session.demoRole };
+    }
   }
 
   // Otherwise return authenticated user
@@ -87,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Demo mode endpoints - set role in session (uses real employees)
+  // Demo mode endpoints - impersonates existing seeded users without mutating their roles
   app.post('/api/demo/set-role', isAuthenticated, async (req: any, res) => {
     try {
       const { role } = req.body;
@@ -96,49 +100,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid role' });
       }
 
-      // Dynamically find an appropriate user for the demo role
-      // First, try to find a user with the exact role
-      let employees = await storage.getUsersByRole(role as any);
+      // Find an existing user with the requested role from seeded data
+      let users = await storage.getUsersByRole(role as any);
       
-      // If no user with that role exists, try to find any user with a different role
-      if (employees.length === 0) {
-        if (role === 'HR_ADMIN') {
-          // For HR_ADMIN, try to find a manager
-          employees = await storage.getUsersByRole('MANAGER');
-        } else if (role === 'MANAGER') {
-          // For MANAGER, try to find an employee or HR_ADMIN
-          employees = await storage.getUsersByRole('EMPLOYEE');
-          if (employees.length === 0) {
-            employees = await storage.getUsersByRole('HR_ADMIN');
-          }
-        } else if (role === 'EMPLOYEE') {
-          // For EMPLOYEE, try to find any user
-          const allUsers = await storage.getAllUsers();
-          employees = allUsers.filter(u => u.role === 'MANAGER' || u.role === 'HR_ADMIN');
+      // If no users with that exact role, find any user to impersonate
+      if (users.length === 0) {
+        const allUsers = await storage.getAllUsers();
+        users = allUsers.filter(u => u.role !== null);
+        
+        if (users.length === 0) {
+          return res.status(500).json({ 
+            message: 'No users found in database. Please seed the database first by calling POST /api/seed' 
+          });
         }
       }
-      
-      // If still no users found, return error
-      if (employees.length === 0) {
-        return res.status(500).json({ message: 'No users found in database. Please seed the database first.' });
-      }
 
-      // Use the first available user
-      const employee = employees[0];
-
-      // Temporarily update the employee's role to match the selected demo role
-      await db
-        .update(users)
-        .set({ role: role as any })
-        .where(eq(users.id, employee.id));
-
-      const updatedEmployee = await storage.getUser(employee.id);
+      // Use the first available user (they keep their actual role in DB)
+      const selectedUser = users[0];
 
       // Store demo role and user ID in session
+      // The user's actual role in the database remains unchanged
       req.session.demoRole = role;
-      req.session.demoUserId = employee.id;
+      req.session.demoUserId = selectedUser.id;
 
-      res.json({ success: true, role, user: updatedEmployee });
+      // Return user with demo role overlaid for the response
+      const userWithDemoRole = { ...selectedUser, role };
+
+      res.json({ success: true, role, user: userWithDemoRole });
     } catch (error) {
       console.error("Error setting demo role:", error);
       res.status(500).json({ message: "Failed to set demo role" });

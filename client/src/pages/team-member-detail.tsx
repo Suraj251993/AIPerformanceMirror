@@ -13,9 +13,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, Clock } from "lucide-react";
 import { TaskValidationDialog } from "@/components/task-validation-dialog";
 import { format } from "date-fns";
+import type { Task } from "@shared/schema";
 
 interface TeamMember {
   id: string;
@@ -27,40 +28,28 @@ interface TeamMember {
   profileImageUrl: string | null;
 }
 
-interface Task {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string | null;
-  priority: string | null;
-  progressPercentage: number | null;
-  managerValidatedPercentage: number | null;
-  validatedBy: string | null;
-  validatedAt: Date | null;
-  validationComment: string | null;
-  dueDate: Date | null;
-  updatedAt: Date | null;
+interface EmployeeTask extends Task {
   projectName: string | null;
 }
 
 export default function TeamMemberDetailPage() {
   const [, params] = useRoute("/team-members/:id");
   const employeeId = params?.id;
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<EmployeeTask | null>(null);
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
 
   const { data: teamMembers } = useQuery<TeamMember[]>({
     queryKey: ['/api/manager/team-members'],
   });
 
-  const { data: tasks, isLoading: tasksLoading } = useQuery<Task[]>({
+  const { data: tasks, isLoading: tasksLoading } = useQuery<EmployeeTask[]>({
     queryKey: ['/api/manager/team-members', employeeId, 'tasks'],
     enabled: !!employeeId,
   });
 
   const employee = teamMembers?.find(m => m.id === employeeId);
 
-  const handleValidateClick = (task: Task) => {
+  const handleValidateClick = (task: EmployeeTask) => {
     setSelectedTask(task);
     setValidationDialogOpen(true);
   };

@@ -16,6 +16,8 @@ import DemoLogin from "@/pages/demo-login";
 import HRDashboard from "@/pages/hr-dashboard";
 import ManagerDashboard from "@/pages/manager-dashboard";
 import EmployeeView from "@/pages/employee-view";
+import TeamMembersPage from "@/pages/team-members";
+import TeamMemberDetailPage from "@/pages/team-member-detail";
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -78,7 +80,11 @@ function Router() {
                 </>
               )}
               {user?.role === 'MANAGER' && (
-                <Route path="/" component={ManagerDashboard} />
+                <>
+                  <Route path="/" component={ManagerDashboard} />
+                  <Route path="/team-members" component={TeamMembersPage} />
+                  <Route path="/team-members/:id" component={TeamMemberDetailPage} />
+                </>
               )}
               {user?.role === 'EMPLOYEE' && (
                 <Route path="/" component={EmployeeView} />

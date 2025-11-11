@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { KPICard } from "@/components/kpi-card";
-import { Users, TrendingUp, AlertTriangle, Target } from "lucide-react";
+import { Users, TrendingUp, AlertTriangle, Target, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +10,9 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { ScoreDetailsModal } from "@/components/score-details-modal";
 import { FeedbackDialog } from "@/components/feedback-dialog";
-import { TaskValidationDialog } from "@/components/task-validation-dialog";
 import { AnimatedBackground } from "@/components/animated-background";
-import type { User, Score, Task } from "@shared/schema";
+import { Link } from "wouter";
+import type { User, Score } from "@shared/schema";
 
 interface TeamData {
   kpis: {
@@ -28,14 +28,9 @@ interface TeamData {
 export default function ManagerDashboard() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [feedbackUserId, setFeedbackUserId] = useState<string | null>(null);
-  const [validationTask, setValidationTask] = useState<(Task & { assigneeName?: string; projectName?: string }) | null>(null);
 
   const { data, isLoading } = useQuery<TeamData>({
     queryKey: ["/api/dashboard/manager"],
-  });
-
-  const { data: teamTasks, isLoading: tasksLoading } = useQuery<Array<Task & { assigneeName?: string; projectName?: string }>>({
-    queryKey: ["/api/manager/team-tasks"],
   });
 
   const getScoreBadgeVariant = (score: number) => {
@@ -186,87 +181,40 @@ export default function ManagerDashboard() {
             </Card>
           </motion.div>
 
-          {/* Team Tasks */}
+          {/* Task Validation CTA */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.5 }}
           >
-            <Card>
-              <div className="p-6 border-b border-border">
-                <h2 className="text-xl font-semibold">Team Tasks</h2>
-              </div>
-              <div className="p-6">
-                {tasksLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="h-20 animate-pulse bg-muted/20 rounded-lg" />
-                    ))}
+            <Card className="overflow-hidden">
+              <div className="p-6 relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10">
+                        <CheckCircle2 className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-semibold">Task Validation</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Review and validate your team members' task completion
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground mt-2">
+                      Navigate to Team Members to view individual employee tasks and validate their reported completion percentages.
+                    </p>
                   </div>
-                ) : teamTasks && teamTasks.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full" data-testid="table-team-tasks">
-                      <thead>
-                        <tr className="border-b border-border text-left">
-                          <th className="p-3 text-sm font-medium text-muted-foreground">Task</th>
-                          <th className="p-3 text-sm font-medium text-muted-foreground">Assignee</th>
-                          <th className="p-3 text-sm font-medium text-muted-foreground text-center">Employee %</th>
-                          <th className="p-3 text-sm font-medium text-muted-foreground text-center">Validated %</th>
-                          <th className="p-3 text-sm font-medium text-muted-foreground">Status</th>
-                          <th className="p-3 text-sm font-medium text-muted-foreground">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {teamTasks.slice(0, 10).map((task) => (
-                          <tr key={task.id} className="border-b border-border hover-elevate">
-                            <td className="p-3">
-                              <div className="font-medium">{task.title}</div>
-                              {task.projectName && (
-                                <div className="text-xs text-muted-foreground">{task.projectName}</div>
-                              )}
-                            </td>
-                            <td className="p-3 text-sm">{task.assigneeName}</td>
-                            <td className="p-3 text-center">
-                              <div className="text-lg font-semibold" data-testid={`text-employee-percent-${task.id}`}>
-                                {task.progressPercentage}%
-                              </div>
-                            </td>
-                            <td className="p-3 text-center">
-                              {task.managerValidatedPercentage !== null && task.managerValidatedPercentage !== undefined ? (
-                                <div className="text-lg font-semibold text-primary" data-testid={`text-validated-percent-${task.id}`}>
-                                  {task.managerValidatedPercentage}%
-                                </div>
-                              ) : (
-                                <div className="text-sm text-muted-foreground" data-testid={`text-validated-percent-${task.id}`}>
-                                  Not Set
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              <Badge variant="outline" className="text-xs">
-                                {task.status}
-                              </Badge>
-                            </td>
-                            <td className="p-3">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => setValidationTask(task)}
-                                data-testid={`button-validate-task-${task.id}`}
-                              >
-                                Validate
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No tasks found for your team
-                  </div>
-                )}
+                  <Link href="/team-members">
+                    <Button size="lg" data-testid="button-go-to-team-members">
+                      <Users className="w-4 h-4 mr-2" />
+                      View Team Members
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </Card>
           </motion.div>
@@ -374,14 +322,6 @@ export default function ManagerDashboard() {
           toUserId={feedbackUserId}
           open={!!feedbackUserId}
           onOpenChange={(open) => !open && setFeedbackUserId(null)}
-        />
-      )}
-
-      {validationTask && (
-        <TaskValidationDialog
-          task={validationTask}
-          open={!!validationTask}
-          onOpenChange={(open) => !open && setValidationTask(null)}
         />
       )}
     </div>

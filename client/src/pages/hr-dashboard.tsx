@@ -248,7 +248,7 @@ export default function HRDashboard() {
                           data-testid={`button-give-feedback-${employee.id}`}
                         >
                           <MessageSquare className="w-4 h-4 mr-1" />
-                          Give Feedback
+                          Comment
                         </Button>
                         <Button
                           variant="ghost"

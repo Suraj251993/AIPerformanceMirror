@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Shield, Users, User, ArrowRight } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -32,8 +33,11 @@ function RoleCard({ role, title, name, description, icon, color, features, onSel
       <Card className="relative overflow-hidden hover-elevate cursor-pointer h-full" data-testid={`card-role-${role.toLowerCase()}`}>
         <div className={`absolute top-0 left-0 w-full h-1 ${color}`} />
         <CardHeader>
-          <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>
-            {icon}
+          <div className="flex items-start justify-between">
+            <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>
+              {icon}
+            </div>
+            <Badge variant="secondary" className="text-xs">Demo</Badge>
           </div>
           <CardTitle className="text-xl mt-4">{title}</CardTitle>
           <CardDescription className="text-base">{name}</CardDescription>

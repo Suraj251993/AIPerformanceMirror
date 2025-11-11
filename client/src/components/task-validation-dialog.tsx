@@ -40,9 +40,10 @@ export function TaskValidationDialog({ task, open, onOpenChange }: TaskValidatio
         title: "Validation saved",
         description: "Task completion percentage has been validated successfully.",
       });
-      // Invalidate manager dashboard queries to refresh task list
+      // Invalidate all relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/manager"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/hr"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/team-tasks"] });
       onOpenChange(false);
       resetForm();
     },
@@ -87,7 +88,12 @@ export function TaskValidationDialog({ task, open, onOpenChange }: TaskValidatio
   };
 
   const employeeReported = task.progressPercentage;
-  const hasChanged = newPercentage !== (task.managerValidatedPercentage ?? task.progressPercentage);
+  // Allow saving if: 
+  // 1. Percentage changed from last validated value, OR
+  // 2. This is first validation (even if confirming employee's percentage)
+  const hasChanged = task.managerValidatedPercentage === null || task.managerValidatedPercentage === undefined
+    ? true  // First validation - always allow
+    : newPercentage !== task.managerValidatedPercentage;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

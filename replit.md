@@ -37,25 +37,30 @@ The database includes core tables for `users` (with role, department, manager hi
 ## Recent Features (November 2025)
 
 ### Task Completion Validation System
-A manager validation workflow allowing managers to review and adjust employee-reported task completion percentages with complete audit trails, accessed through the Team Members interface.
+A manager validation workflow allowing managers to review and adjust employee-reported task completion percentages with complete audit trails, integrated directly into the Manager Dashboard via expandable team member sections.
 
 **Key Components:**
 - **Database Schema**: Extended `tasks` table with `managerValidatedPercentage`, `validatedBy`, `validatedAt`, and `validationComment` columns. Created `task_validation_history` table to track all validation changes with old/new values, timestamps, and manager IDs.
 - **Backend API**: 
-  - POST `/api/tasks/:taskId/validate` - Validates tasks (role-restricted to MANAGER and HR_ADMIN) with PostgreSQL transactions and `FOR UPDATE` row-level locking
-  - GET `/api/tasks/:taskId/validation-history` - Retrieves complete audit trail
+  - POST `/api/tasks/:taskId/validate` - Validates tasks (role-restricted to MANAGER and HR_ADMIN) with PostgreSQL transactions and `FOR UPDATE` row-level locking. Includes debug logging for troubleshooting.
+  - GET `/api/tasks/:taskId/validation-history` - Retrieves complete audit trail with validator names (concatenates firstName + lastName)
   - GET `/api/manager/team-members` - Lists all employees reporting to current manager
   - GET `/api/manager/team-members/:employeeId/tasks` - Gets tasks for specific employee with validation data
 - **UI Navigation Flow**: 
-  - Managers access via sidebar → "Team Members" → Grid of employee cards
-  - Click "View Tasks" on employee → Shows employee's task table with Validate buttons
+  - Managers access via Manager Dashboard → "Task Validation" section
+  - Click on team member collapsible to expand inline
+  - Task table appears within expandable section with Validate buttons
   - Click "Validate" → Opens `TaskValidationDialog` for percentage adjustment
-  - Manager Dashboard shows CTA card directing to Team Members view
 - **UI Components**: 
-  - `TeamMembersPage`: Grid layout displaying team member cards with "View Tasks" buttons
-  - `TeamMemberDetailPage`: Employee-specific task table with employee info header and validation controls
-  - `TaskValidationDialog`: Reusable dialog with percentage slider (0-100%, 5% steps), required comment field (≥10 characters), and validation history display. Uses `useEffect([task?.id, open])` to prevent stale state.
+  - `TeamMemberTasksCollapsible`: Collapsible component showing employee info and expandable task table (used in Manager Dashboard)
+  - `TeamMemberTasksSection`: Task table component with validation controls (query key: `["/api/manager/team-members", employeeId, "tasks"]`)
+  - `TaskValidationDialog`: Reusable dialog with percentage slider (0-100%, 5% steps), required comment field (≥10 characters), and previous validation display. Uses `useEffect([task?.id, open])` to prevent stale state. Invalidates multiple query keys on save to ensure UI updates.
 - **Validation Rules**: Managers must provide comment ≥10 characters; percentage must be 0-100; complete backend validation with Zod schemas.
+- **Cache Invalidation Strategy**: On successful validation, invalidates `["/api/dashboard/manager"]`, `["/api/dashboard/hr"]`, `["/api/manager/team-tasks"]`, and `["/api/manager/team-members"]` (uses TanStack Query partial matching to refresh all nested employee task queries).
+
+**Recent Bug Fixes (Nov 11, 2025):**
+- Fixed validation history API 500 error: Changed from querying non-existent `users.name` to concatenating `firstName` and `lastName`
+- Fixed UI not refreshing after validation: Added proper cache invalidation for team member task queries using partial query key matching
 
 **Known Limitations:**
 - Auth reconciliation between OIDC subject IDs and seeded demo user IDs needs deeper integration across all routes for production OIDC use. Feature currently works fully with demo mode (hardcoded employee IDs).

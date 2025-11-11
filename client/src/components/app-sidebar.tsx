@@ -28,7 +28,6 @@ export function AppSidebar() {
 
   const managerItems = [
     { title: "Dashboard", url: "/", icon: Home },
-    { title: "Team Members", url: "/team-members", icon: Users },
   ];
 
   const employeeItems = [

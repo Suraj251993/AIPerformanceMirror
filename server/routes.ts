@@ -721,6 +721,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = req.params.taskId;
       const { newPercentage, validationComment } = req.body;
 
+      console.log(`[VALIDATION] Task ${taskId} - Received: ${newPercentage}%, Comment: "${validationComment?.substring(0, 50)}..."`);
+
       // Validate input
       if (typeof newPercentage !== 'number' || newPercentage < 0 || newPercentage > 100) {
         return res.status(400).json({ message: 'Invalid percentage value' });
@@ -776,6 +778,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { oldPercentage, newPercentage };
       });
 
+      console.log(`[VALIDATION] Task ${taskId} - Saved: ${result.oldPercentage}% → ${result.newPercentage}%`);
+
       res.json({ 
         message: 'Task validation saved successfully',
         oldPercentage: result.oldPercentage,
@@ -812,16 +816,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with validator user details
       const history = await Promise.all(
         historyRecords.map(async (record) => {
-          const validator = await db
-            .select({ name: users.name, email: users.email })
+          const [validator] = await db
+            .select({ 
+              firstName: users.firstName, 
+              lastName: users.lastName,
+              email: users.email 
+            })
             .from(users)
             .where(eq(users.id, record.validatedBy))
             .limit(1);
           
           return {
             ...record,
-            validatorName: validator[0]?.name || 'Unknown',
-            validatorEmail: validator[0]?.email || '',
+            validatorName: validator 
+              ? `${validator.firstName || ''} ${validator.lastName || ''}`.trim() || 'Unknown'
+              : 'Unknown',
+            validatorEmail: validator?.email || '',
           };
         })
       );

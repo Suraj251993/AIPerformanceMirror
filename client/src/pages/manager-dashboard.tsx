@@ -1,18 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
 import { KPICard } from "@/components/kpi-card";
-import { Users, TrendingUp, AlertTriangle, Target, ArrowRight, CheckCircle2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Users, TrendingUp, AlertTriangle, Target, ChevronDown, ChevronUp, CheckCircle2, Calendar, Clock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScoreCircle } from "@/components/score-circle";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { ScoreDetailsModal } from "@/components/score-details-modal";
 import { FeedbackDialog } from "@/components/feedback-dialog";
+import { TaskValidationDialog } from "@/components/task-validation-dialog";
 import { AnimatedBackground } from "@/components/animated-background";
-import { Link } from "wouter";
-import type { User, Score } from "@shared/schema";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { format } from "date-fns";
+import { TeamMemberTasksCollapsible } from "@/components/team-member-tasks-collapsible";
+import type { User, Score, Task } from "@shared/schema";
 
 interface TeamData {
   kpis: {
@@ -25,13 +40,45 @@ interface TeamData {
   alerts: { userId: string; userName: string; message: string; severity: 'warning' | 'info' }[];
 }
 
+interface TeamMember {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  department: string | null;
+  role: string | null;
+  profileImageUrl: string | null;
+}
+
+interface EmployeeTask extends Task {
+  projectName?: string;
+}
+
 export default function ManagerDashboard() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [feedbackUserId, setFeedbackUserId] = useState<string | null>(null);
+  const [expandedMembers, setExpandedMembers] = useState<Set<string>>(new Set());
+  const [validationTask, setValidationTask] = useState<EmployeeTask | null>(null);
 
   const { data, isLoading } = useQuery<TeamData>({
     queryKey: ["/api/dashboard/manager"],
   });
+
+  const { data: teamMembers } = useQuery<TeamMember[]>({
+    queryKey: ['/api/manager/team-members'],
+  });
+
+  const toggleMember = (memberId: string) => {
+    setExpandedMembers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(memberId)) {
+        newSet.delete(memberId);
+      } else {
+        newSet.add(memberId);
+      }
+      return newSet;
+    });
+  };
 
   const getScoreBadgeVariant = (score: number) => {
     if (score >= 90) return "default";
@@ -181,41 +228,40 @@ export default function ManagerDashboard() {
             </Card>
           </motion.div>
 
-          {/* Task Validation CTA */}
+          {/* Team Tasks with Validation */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.5 }}
           >
-            <Card className="overflow-hidden">
-              <div className="p-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10">
-                        <CheckCircle2 className="w-6 h-6 text-primary" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-semibold">Task Validation</h2>
-                        <p className="text-sm text-muted-foreground">
-                          Review and validate your team members' task completion
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-muted-foreground mt-2">
-                      Navigate to Team Members to view individual employee tasks and validate their reported completion percentages.
-                    </p>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Task Validation
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Expand team members to view and validate their task completion
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-2" data-testid="section-task-validation">
+                {!teamMembers || teamMembers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No team members found</p>
                   </div>
-                  <Link href="/team-members">
-                    <Button size="lg" data-testid="button-go-to-team-members">
-                      <Users className="w-4 h-4 mr-2" />
-                      View Team Members
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </Link>
-                </div>
-              </div>
+                ) : (
+                  teamMembers.map((member) => (
+                    <TeamMemberTasksCollapsible
+                      key={member.id}
+                      member={member}
+                      isExpanded={expandedMembers.has(member.id)}
+                      onToggle={() => toggleMember(member.id)}
+                      onValidateClick={setValidationTask}
+                    />
+                  ))
+                )}
+              </CardContent>
             </Card>
           </motion.div>
         </div>
@@ -322,6 +368,14 @@ export default function ManagerDashboard() {
           toUserId={feedbackUserId}
           open={!!feedbackUserId}
           onOpenChange={(open) => !open && setFeedbackUserId(null)}
+        />
+      )}
+
+      {validationTask && (
+        <TaskValidationDialog
+          task={validationTask}
+          open={!!validationTask}
+          onOpenChange={(open) => !open && setValidationTask(null)}
         />
       )}
     </div>

@@ -40,10 +40,14 @@ export function TaskValidationDialog({ task, open, onOpenChange }: TaskValidatio
         title: "Validation saved",
         description: "Task completion percentage has been validated successfully.",
       });
-      // Invalidate all relevant queries to refresh data
+      // Invalidate all relevant queries to refresh data across the application
+      // This ensures validated percentages update in all views
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/manager"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/hr"] });
       queryClient.invalidateQueries({ queryKey: ["/api/manager/team-tasks"] });
+      // Invalidate all team member task queries (uses partial matching)
+      // This covers: ["/api/manager/team-members", employeeId, "tasks"]
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/team-members"] });
       onOpenChange(false);
       resetForm();
     },

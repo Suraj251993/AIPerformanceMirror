@@ -65,7 +65,7 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
     enabled: open,
   });
 
-  const canValidate = currentUser?.role === 'MANAGER' || currentUser?.role === 'HR_ADMIN';
+  const canValidate = currentUser?.role === 'MANAGER';
 
   const componentLabels = {
     taskCompletion: "Task Completion",

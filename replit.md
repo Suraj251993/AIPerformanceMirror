@@ -42,7 +42,7 @@ A manager validation workflow allowing managers to review and adjust employee-re
 **Key Components:**
 - **Database Schema**: Extended `tasks` table with `managerValidatedPercentage`, `validatedBy`, `validatedAt`, and `validationComment` columns. Created `task_validation_history` table to track all validation changes with old/new values, timestamps, and manager IDs.
 - **Backend API**: 
-  - POST `/api/tasks/:taskId/validate` - Validates tasks (role-restricted to MANAGER and HR_ADMIN) with PostgreSQL transactions and `FOR UPDATE` row-level locking. Includes debug logging for troubleshooting.
+  - POST `/api/tasks/:taskId/validate` - Validates tasks (role-restricted to MANAGER only) with PostgreSQL transactions and `FOR UPDATE` row-level locking. Includes debug logging for troubleshooting.
   - GET `/api/tasks/:taskId/validation-history` - Retrieves complete audit trail with validator names (concatenates firstName + lastName)
   - GET `/api/manager/team-members` - Lists all employees reporting to current manager
   - GET `/api/manager/team-members/:employeeId/tasks` - Gets tasks for specific employee with validation data
@@ -64,8 +64,8 @@ A manager validation workflow allowing managers to review and adjust employee-re
   - Fixed UI not refreshing after validation: Added proper cache invalidation for team member task queries using partial query key matching
 - **Feature Addition:**
   - Added task validation to Score Details Modal (accessible from HR Dashboard and Employee View)
-  - Managers and HR Admins can now validate tasks directly from employee performance modals
-  - Integrated existing TaskValidationDialog component with role-based access control
+  - Managers can now validate tasks directly from employee performance modals (HR Admins can view but not validate)
+  - Integrated existing TaskValidationDialog component with role-based access control (MANAGER only)
   - Updated `/api/users/:userId/tasks` endpoint to include validation fields
   - Added comprehensive cache invalidation for `/api/users` and `/api/scores` queries
 

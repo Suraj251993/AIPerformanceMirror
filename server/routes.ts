@@ -721,7 +721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUser = await getCurrentUser(req);
       
       // Only managers can validate task completion
-      if (currentUser?.role !== 'MANAGER' && currentUser?.role !== 'HR_ADMIN') {
+      if (currentUser?.role !== 'MANAGER') {
         return res.status(403).json({ message: 'Forbidden - Only Managers can validate task completion' });
       }
 

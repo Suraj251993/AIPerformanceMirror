@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -62,6 +62,13 @@ export function TaskValidationDialog({ task, open, onOpenChange }: TaskValidatio
     setNewPercentage(defaultPercentage);
     setValidationComment('');
   };
+
+  // Reset form whenever task changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      resetForm();
+    }
+  }, [task?.id, open]);
 
   const handleSubmit = () => {
     if (validationComment.trim().length < 10) {

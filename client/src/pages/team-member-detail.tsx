@@ -29,7 +29,7 @@ interface TeamMember {
 }
 
 interface EmployeeTask extends Task {
-  projectName: string | null;
+  projectName?: string;
 }
 
 export default function TeamMemberDetailPage() {

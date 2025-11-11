@@ -95,7 +95,15 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
     if (statusFilter && statusFilter !== "all") {
       const normalizedTaskStatus = task.status?.toLowerCase();
       const normalizedFilter = statusFilter.toLowerCase();
-      if (normalizedTaskStatus !== normalizedFilter) return false;
+      
+      // "done" filter should match both "done" and "completed" statuses
+      if (normalizedFilter === "done") {
+        if (normalizedTaskStatus !== "done" && normalizedTaskStatus !== "completed") {
+          return false;
+        }
+      } else if (normalizedTaskStatus !== normalizedFilter) {
+        return false;
+      }
     }
     
     return true;

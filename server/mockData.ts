@@ -186,7 +186,7 @@ export async function generateMockFeedback(employeeIds: string[], managerIds: st
         fromUserId: managerIds[Math.floor(Math.random() * managerIds.length)],
         toUserId: empId,
         rating: Math.floor(Math.random() * 2) + 4, // 4-5 rating
-        category: [categories[Math.floor(Math.random() * categories.length)]],
+        category: categories[Math.floor(Math.random() * categories.length)],
         comment: [
           'Great work on the recent project! Your attention to detail was excellent.',
           'Good communication skills. Keep up the collaborative approach.',

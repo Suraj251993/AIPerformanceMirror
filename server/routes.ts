@@ -12,17 +12,9 @@ import { registerZohoRoutes } from "./zohoRoutes";
 // Helper function to get current user (respecting demo mode)
 async function getCurrentUser(req: any): Promise<any> {
   // Check if demo role is set in session (uses real employees)
-  if (req.session.demoRole) {
-    // Map demo role to real employee IDs
-    // Meenakshi Dabral for HR_ADMIN and MANAGER
-    // Jeeveetha P C K for EMPLOYEE
-    const realEmployeeMap: Record<string, string> = {
-      'HR_ADMIN': '7e85534a-5efe-4fba-aa13-4067b013692d',  // Meenakshi Dabral
-      'MANAGER': '7e85534a-5efe-4fba-aa13-4067b013692d',   // Meenakshi Dabral
-      'EMPLOYEE': '22157a20-f283-4e4b-8f1b-8b886f17fc55',  // Jeeveetha P C K
-    };
-    const employeeId = realEmployeeMap[req.session.demoRole];
-    return await storage.getUser(employeeId);
+  if (req.session.demoRole && req.session.demoUserId) {
+    // Use the user ID stored in the session during demo mode setup
+    return await storage.getUser(req.session.demoUserId);
   }
 
   // Otherwise return authenticated user
@@ -104,33 +96,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid role' });
       }
 
-      // Store demo role in session
-      req.session.demoRole = role;
+      // Dynamically find an appropriate user for the demo role
+      // First, try to find a user with the exact role
+      let employees = await storage.getUsersByRole(role as any);
       
-      // Map demo role to real employee IDs
-      // Meenakshi Dabral for HR_ADMIN and MANAGER
-      // Jeeveetha P C K for EMPLOYEE
-      const realEmployeeMap: Record<string, string> = {
-        'HR_ADMIN': '7e85534a-5efe-4fba-aa13-4067b013692d',  // Meenakshi Dabral
-        'MANAGER': '7e85534a-5efe-4fba-aa13-4067b013692d',   // Meenakshi Dabral
-        'EMPLOYEE': '22157a20-f283-4e4b-8f1b-8b886f17fc55',  // Jeeveetha P C K
-      };
-
-      const employeeId = realEmployeeMap[role];
-      const employee = await storage.getUser(employeeId);
-
-      if (!employee) {
-        return res.status(500).json({ message: 'Employee not found' });
+      // If no user with that role exists, try to find any user with a different role
+      if (employees.length === 0) {
+        if (role === 'HR_ADMIN') {
+          // For HR_ADMIN, try to find a manager
+          employees = await storage.getUsersByRole('MANAGER');
+        } else if (role === 'MANAGER') {
+          // For MANAGER, try to find an employee or HR_ADMIN
+          employees = await storage.getUsersByRole('EMPLOYEE');
+          if (employees.length === 0) {
+            employees = await storage.getUsersByRole('HR_ADMIN');
+          }
+        } else if (role === 'EMPLOYEE') {
+          // For EMPLOYEE, try to find any user
+          const allUsers = await storage.getAllUsers();
+          employees = allUsers.filter(u => u.role === 'MANAGER' || u.role === 'HR_ADMIN');
+        }
+      }
+      
+      // If still no users found, return error
+      if (employees.length === 0) {
+        return res.status(500).json({ message: 'No users found in database. Please seed the database first.' });
       }
 
+      // Use the first available user
+      const employee = employees[0];
+
       // Temporarily update the employee's role to match the selected demo role
-      // This allows Meenakshi to act as both HR_ADMIN and MANAGER
       await db
         .update(users)
         .set({ role: role as any })
-        .where(eq(users.id, employeeId));
+        .where(eq(users.id, employee.id));
 
-      const updatedEmployee = await storage.getUser(employeeId);
+      const updatedEmployee = await storage.getUser(employee.id);
+
+      // Store demo role and user ID in session
+      req.session.demoRole = role;
+      req.session.demoUserId = employee.id;
 
       res.json({ success: true, role, user: updatedEmployee });
     } catch (error) {

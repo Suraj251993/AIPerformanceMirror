@@ -11,13 +11,20 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScoreCircle } from "@/components/score-circle";
 import { TaskValidationDialog } from "@/components/task-validation-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import type { Score, ScoreComponents, User } from "@shared/schema";
 import { motion } from "framer-motion";
-import { Calendar, CheckCircle2, Clock, Flag, Search } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, Flag, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 
 interface ScoreDetailsModalProps {
@@ -56,6 +63,7 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
   const { user: currentUser } = useAuth();
   const [validatingTask, setValidatingTask] = useState<UserTask | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   
   const { data, isLoading } = useQuery<ScoreDetailsData>({
     queryKey: ["/api/scores", userId],
@@ -69,17 +77,28 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
 
   const canValidate = currentUser?.role === 'MANAGER';
 
-  // Filter tasks based on search query
+  // Filter tasks based on search query and status
   const filteredTasks = tasks?.filter(task => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      task.title?.toLowerCase().includes(query) ||
-      task.description?.toLowerCase().includes(query) ||
-      task.projectName?.toLowerCase().includes(query) ||
-      task.status?.toLowerCase().includes(query) ||
-      task.priority?.toLowerCase().includes(query)
-    );
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = 
+        task.title?.toLowerCase().includes(query) ||
+        task.description?.toLowerCase().includes(query) ||
+        task.projectName?.toLowerCase().includes(query) ||
+        task.status?.toLowerCase().includes(query) ||
+        task.priority?.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+    }
+    
+    // Apply status filter
+    if (statusFilter && statusFilter !== "all") {
+      const normalizedTaskStatus = task.status?.toLowerCase();
+      const normalizedFilter = statusFilter.toLowerCase();
+      if (normalizedTaskStatus !== normalizedFilter) return false;
+    }
+    
+    return true;
   });
 
   const componentLabels = {
@@ -307,18 +326,33 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
               transition={{ duration: 0.4, delay: 0.4 }}
             >
               <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
                   <h3 className="text-lg font-semibold">Tasks</h3>
-                  <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search tasks..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
-                      data-testid="input-search-tasks"
-                    />
+                  <div className="flex items-center gap-2 flex-1 justify-end">
+                    <div className="relative w-48">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search tasks..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-search-tasks"
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-40" data-testid="select-status-filter">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" data-testid="status-option-all">All Status</SelectItem>
+                        <SelectItem value="done" data-testid="status-option-done">Done</SelectItem>
+                        <SelectItem value="in_progress" data-testid="status-option-in-progress">In Progress</SelectItem>
+                        <SelectItem value="todo" data-testid="status-option-todo">To Do</SelectItem>
+                        <SelectItem value="blocked" data-testid="status-option-blocked">Blocked</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 {tasksLoading ? (
@@ -426,11 +460,11 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                       </motion.div>
                     ))}
                   </div>
-                ) : searchQuery && tasks && tasks.length > 0 ? (
+                ) : (searchQuery || statusFilter !== "all") && tasks && tasks.length > 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No tasks match your search</p>
-                    <p className="text-sm mt-1">Try different keywords</p>
+                    <Filter className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No tasks match your filters</p>
+                    <p className="text-sm mt-1">Try adjusting your search or status filter</p>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">

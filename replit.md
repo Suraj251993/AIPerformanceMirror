@@ -37,13 +37,24 @@ The database includes core tables for `users` (with role, department, manager hi
 ## Recent Features (November 2025)
 
 ### Task Completion Validation System
-A manager validation workflow allowing managers to review and adjust employee-reported task completion percentages with complete audit trails.
+A manager validation workflow allowing managers to review and adjust employee-reported task completion percentages with complete audit trails, accessed through the Team Members interface.
 
 **Key Components:**
 - **Database Schema**: Extended `tasks` table with `managerValidatedPercentage`, `validatedBy`, `validatedAt`, and `validationComment` columns. Created `task_validation_history` table to track all validation changes with old/new values, timestamps, and manager IDs.
-- **Backend API**: POST `/api/tasks/:taskId/validate` for managers to validate tasks (role-restricted to MANAGER and HR_ADMIN). Uses PostgreSQL transactions with `FOR UPDATE` row-level locking to prevent race conditions. GET `/api/tasks/:taskId/validation-history` retrieves audit trail.
-- **Manager Dashboard**: Enhanced with team tasks section (GET `/api/manager/team-tasks`) displaying employee-reported vs. manager-validated percentages. Fetches all tasks assigned to employees who report to the current manager.
-- **UI Components**: `TaskValidationDialog` provides percentage slider (0-100%, 5% steps), required comment field (≥10 characters), and displays previous validation history. Uses `useEffect([task?.id, open])` to prevent stale state when switching between tasks.
+- **Backend API**: 
+  - POST `/api/tasks/:taskId/validate` - Validates tasks (role-restricted to MANAGER and HR_ADMIN) with PostgreSQL transactions and `FOR UPDATE` row-level locking
+  - GET `/api/tasks/:taskId/validation-history` - Retrieves complete audit trail
+  - GET `/api/manager/team-members` - Lists all employees reporting to current manager
+  - GET `/api/manager/team-members/:employeeId/tasks` - Gets tasks for specific employee with validation data
+- **UI Navigation Flow**: 
+  - Managers access via sidebar → "Team Members" → Grid of employee cards
+  - Click "View Tasks" on employee → Shows employee's task table with Validate buttons
+  - Click "Validate" → Opens `TaskValidationDialog` for percentage adjustment
+  - Manager Dashboard shows CTA card directing to Team Members view
+- **UI Components**: 
+  - `TeamMembersPage`: Grid layout displaying team member cards with "View Tasks" buttons
+  - `TeamMemberDetailPage`: Employee-specific task table with employee info header and validation controls
+  - `TaskValidationDialog`: Reusable dialog with percentage slider (0-100%, 5% steps), required comment field (≥10 characters), and validation history display. Uses `useEffect([task?.id, open])` to prevent stale state.
 - **Validation Rules**: Managers must provide comment ≥10 characters; percentage must be 0-100; complete backend validation with Zod schemas.
 
 **Known Limitations:**

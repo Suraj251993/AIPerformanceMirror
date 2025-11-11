@@ -58,9 +58,16 @@ A manager validation workflow allowing managers to review and adjust employee-re
 - **Validation Rules**: Managers must provide comment ≥10 characters; percentage must be 0-100; complete backend validation with Zod schemas.
 - **Cache Invalidation Strategy**: On successful validation, invalidates `["/api/dashboard/manager"]`, `["/api/dashboard/hr"]`, `["/api/manager/team-tasks"]`, and `["/api/manager/team-members"]` (uses TanStack Query partial matching to refresh all nested employee task queries).
 
-**Recent Bug Fixes (Nov 11, 2025):**
-- Fixed validation history API 500 error: Changed from querying non-existent `users.name` to concatenating `firstName` and `lastName`
-- Fixed UI not refreshing after validation: Added proper cache invalidation for team member task queries using partial query key matching
+**Recent Updates (Nov 11, 2025):**
+- **Bug Fixes:**
+  - Fixed validation history API 500 error: Changed from querying non-existent `users.name` to concatenating `firstName` and `lastName`
+  - Fixed UI not refreshing after validation: Added proper cache invalidation for team member task queries using partial query key matching
+- **Feature Addition:**
+  - Added task validation to Score Details Modal (accessible from HR Dashboard and Employee View)
+  - Managers and HR Admins can now validate tasks directly from employee performance modals
+  - Integrated existing TaskValidationDialog component with role-based access control
+  - Updated `/api/users/:userId/tasks` endpoint to include validation fields
+  - Added comprehensive cache invalidation for `/api/users` and `/api/scores` queries
 
 **Known Limitations:**
 - Auth reconciliation between OIDC subject IDs and seeded demo user IDs needs deeper integration across all routes for production OIDC use. Feature currently works fully with demo mode (hardcoded employee IDs).

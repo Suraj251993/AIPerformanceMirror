@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -8,7 +9,10 @@ import {
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScoreCircle } from "@/components/score-circle";
+import { TaskValidationDialog } from "@/components/task-validation-dialog";
+import { useAuth } from "@/hooks/useAuth";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import type { Score, ScoreComponents, User } from "@shared/schema";
 import { motion } from "framer-motion";
@@ -39,9 +43,18 @@ interface UserTask {
   progressPercentage: number | null;
   estimatedHours: number | null;
   projectName: string | null;
+  managerValidatedPercentage: number | null;
+  validatedBy: string | null;
+  validatedAt: Date | null;
+  validationComment: string | null;
+  assigneeId: string;
+  assigneeName: string | null;
 }
 
 export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsModalProps) {
+  const { user: currentUser } = useAuth();
+  const [validatingTask, setValidatingTask] = useState<UserTask | null>(null);
+  
   const { data, isLoading } = useQuery<ScoreDetailsData>({
     queryKey: ["/api/scores", userId],
     enabled: open,
@@ -51,6 +64,8 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
     queryKey: ["/api/users", userId, "tasks"],
     enabled: open,
   });
+
+  const canValidate = currentUser?.role === 'MANAGER' || currentUser?.role === 'HR_ADMIN';
 
   const componentLabels = {
     taskCompletion: "Task Completion",
@@ -328,7 +343,7 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground mb-3">
                           {task.startDate && (
                             <div className="flex items-center gap-1" data-testid={`task-start-date-${task.id}`}>
                               <Calendar className="w-3 h-3" />
@@ -347,12 +362,37 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                               <span>Completed: {format(new Date(task.completedAt), 'MMM dd, yyyy')}</span>
                             </div>
                           )}
-                          {task.progressPercentage !== null && task.progressPercentage > 0 && (
-                            <div className="flex items-center gap-2">
-                              <span>Progress:</span>
-                              <Progress value={task.progressPercentage} className="h-1 flex-1" />
-                              <span>{task.progressPercentage}%</span>
-                            </div>
+                        </div>
+
+                        {/* Progress and Validation Section */}
+                        <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+                          <div className="flex items-center gap-4 flex-1">
+                            {task.progressPercentage !== null && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-muted-foreground">Employee:</span>
+                                <span className="font-semibold text-primary" data-testid={`task-employee-progress-${task.id}`}>
+                                  {task.progressPercentage}%
+                                </span>
+                              </div>
+                            )}
+                            {task.managerValidatedPercentage !== null && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-muted-foreground">Validated:</span>
+                                <span className="font-semibold text-primary" data-testid={`task-validated-progress-${task.id}`}>
+                                  {task.managerValidatedPercentage}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {canValidate && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setValidatingTask(task)}
+                              data-testid={`button-validate-task-${task.id}`}
+                            >
+                              Validate
+                            </Button>
                           )}
                         </div>
                       </motion.div>
@@ -368,6 +408,15 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
           </div>
         )}
       </DialogContent>
+
+      {/* Task Validation Dialog */}
+      {validatingTask && (
+        <TaskValidationDialog
+          task={validatingTask as any}
+          open={!!validatingTask}
+          onOpenChange={(open) => !open && setValidatingTask(null)}
+        />
+      )}
     </Dialog>
   );
 }

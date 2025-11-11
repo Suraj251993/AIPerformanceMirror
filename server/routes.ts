@@ -6,7 +6,7 @@ import { insertFeedbackSchema } from "@shared/schema";
 import { seedMockData } from "./mockData";
 import { db } from "./db";
 import { users, feedback as feedbackTable, tasks, projects } from "@shared/schema";
-import { eq, desc, inArray, ne } from "drizzle-orm";
+import { eq, desc, inArray, ne, sql } from "drizzle-orm";
 import { registerZohoRoutes } from "./zohoRoutes";
 
 // Helper function to get current user (respecting demo mode)
@@ -479,9 +479,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           progressPercentage: tasks.progressPercentage,
           estimatedHours: tasks.estimatedHours,
           projectName: projects.name,
+          managerValidatedPercentage: tasks.managerValidatedPercentage,
+          validatedBy: tasks.validatedBy,
+          validatedAt: tasks.validatedAt,
+          validationComment: tasks.validationComment,
+          assigneeId: tasks.assigneeId,
+          assigneeName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`.as('assigneeName'),
         })
         .from(tasks)
         .leftJoin(projects, eq(tasks.projectId, projects.id))
+        .leftJoin(users, eq(tasks.assigneeId, users.id))
         .where(eq(tasks.assigneeId, userId))
         .orderBy(desc(tasks.createdAt));
 

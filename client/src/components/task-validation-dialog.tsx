@@ -48,6 +48,11 @@ export function TaskValidationDialog({ task, open, onOpenChange }: TaskValidatio
       // Invalidate all team member task queries (uses partial matching)
       // This covers: ["/api/manager/team-members", employeeId, "tasks"]
       queryClient.invalidateQueries({ queryKey: ["/api/manager/team-members"] });
+      // Invalidate user task queries (for Score Details Modal)
+      // This covers: ["/api/users", userId, "tasks"]
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      // Invalidate score queries (may affect overall score)
+      queryClient.invalidateQueries({ queryKey: ["/api/scores"] });
       onOpenChange(false);
       resetForm();
     },

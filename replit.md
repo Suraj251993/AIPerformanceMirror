@@ -62,12 +62,15 @@ A manager validation workflow allowing managers to review and adjust employee-re
 - **Bug Fixes:**
   - Fixed validation history API 500 error: Changed from querying non-existent `users.name` to concatenating `firstName` and `lastName`
   - Fixed UI not refreshing after validation: Added proper cache invalidation for team member task queries using partial query key matching
+  - Fixed Activity Timeline showing "No recent activity": Seeded activity_events table with 63 real activity entries from tasks and time logs
 - **Feature Addition:**
   - Added task validation to Score Details Modal (accessible from HR Dashboard and Employee View)
   - Managers can now validate tasks directly from employee performance modals (HR Admins can view but not validate)
   - Integrated existing TaskValidationDialog component with role-based access control (MANAGER only)
   - Updated `/api/users/:userId/tasks` endpoint to include validation fields
   - Added comprehensive cache invalidation for `/api/users` and `/api/scores` queries
+  - Added task search functionality to Score Details Modal with multi-field filtering (title, description, project, status, priority)
+  - Task search box is available for all roles (HR_ADMIN, MANAGER, EMPLOYEE)
 
 **Known Limitations:**
 - Auth reconciliation between OIDC subject IDs and seeded demo user IDs needs deeper integration across all routes for production OIDC use. Feature currently works fully with demo mode (hardcoded employee IDs).

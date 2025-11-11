@@ -516,6 +516,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Task validation routes (Manager only)
+  app.post('/api/tasks/:taskId/validate', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await getCurrentUser(req);
+      
+      // Only managers can validate task completion
+      if (currentUser?.role !== 'MANAGER' && currentUser?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden - Only Managers can validate task completion' });
+      }
+
+      const taskId = req.params.taskId;
+      const { newPercentage, validationComment } = req.body;
+
+      // Validate input
+      if (typeof newPercentage !== 'number' || newPercentage < 0 || newPercentage > 100) {
+        return res.status(400).json({ message: 'Invalid percentage value' });
+      }
+      if (!validationComment || validationComment.trim().length < 10) {
+        return res.status(400).json({ message: 'Comment must be at least 10 characters' });
+      }
+
+      // Get the current task
+      const [task] = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .limit(1);
+
+      if (!task) {
+        return res.status(404).json({ message: 'Task not found' });
+      }
+
+      const oldPercentage = task.managerValidatedPercentage ?? task.progressPercentage;
+
+      // Update task with validation
+      await db
+        .update(tasks)
+        .set({
+          managerValidatedPercentage: newPercentage,
+          validatedBy: currentUser.id,
+          validatedAt: new Date(),
+          validationComment: validationComment.trim(),
+        })
+        .where(eq(tasks.id, taskId));
+
+      // Create audit trail entry
+      const { taskValidationHistory } = await import("@shared/schema");
+      await db.insert(taskValidationHistory).values({
+        taskId,
+        oldPercentage,
+        newPercentage,
+        validatedBy: currentUser.id,
+        validationComment: validationComment.trim(),
+      });
+
+      res.json({ 
+        message: 'Task validation saved successfully',
+        oldPercentage,
+        newPercentage,
+      });
+    } catch (error: any) {
+      console.error("Error validating task:", error);
+      res.status(500).json({ message: "Failed to validate task" });
+    }
+  });
+
+  // Get task validation history (audit trail)
+  app.get('/api/tasks/:taskId/validation-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = req.params.taskId;
+
+      const { taskValidationHistory } = await import("@shared/schema");
+      const history = await db
+        .select({
+          id: taskValidationHistory.id,
+          oldPercentage: taskValidationHistory.oldPercentage,
+          newPercentage: taskValidationHistory.newPercentage,
+          validationComment: taskValidationHistory.validationComment,
+          createdAt: taskValidationHistory.createdAt,
+          validatorName: users.name,
+          validatorEmail: users.email,
+        })
+        .from(taskValidationHistory)
+        .leftJoin(users, eq(taskValidationHistory.validatedBy, users.id))
+        .where(eq(taskValidationHistory.taskId, taskId))
+        .orderBy(desc(taskValidationHistory.createdAt));
+
+      res.json(history);
+    } catch (error: any) {
+      console.error("Error fetching validation history:", error);
+      res.status(500).json({ message: "Failed to fetch validation history" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

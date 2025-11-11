@@ -218,7 +218,7 @@ export default function ManagerDashboard() {
                           onClick={() => setFeedbackUserId(member.id)}
                           data-testid={`button-feedback-${member.id}`}
                         >
-                          Feedback
+                          Comment
                         </Button>
                       </div>
                     </div>

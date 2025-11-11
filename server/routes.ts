@@ -516,6 +516,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get team tasks for manager dashboard
+  app.get('/api/manager/team-tasks', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await getCurrentUser(req);
+      
+      // Only managers and HR admins can access team tasks
+      if (currentUser?.role !== 'MANAGER' && currentUser?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden - Only Managers can access team tasks' });
+      }
+
+      // Get all employees assigned to this manager or all employees if HR admin
+      let teamMemberIds: string[];
+      if (currentUser.role === 'HR_ADMIN') {
+        // HR Admin sees all employees
+        const allUsers = await db.select({ id: users.id }).from(users);
+        teamMemberIds = allUsers.map(u => u.id);
+      } else {
+        // Manager sees their direct reports
+        const teamMembers = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.managerId, currentUser.id));
+        teamMemberIds = teamMembers.map(u => u.id);
+      }
+
+      if (teamMemberIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Get tasks for team members using inArray
+      const { inArray } = await import("drizzle-orm");
+      const teamTasks = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+          priority: tasks.priority,
+          assigneeId: tasks.assigneeId,
+          progressPercentage: tasks.progressPercentage,
+          managerValidatedPercentage: tasks.managerValidatedPercentage,
+          validatedBy: tasks.validatedBy,
+          validatedAt: tasks.validatedAt,
+          validationComment: tasks.validationComment,
+          dueDate: tasks.dueDate,
+          updatedAt: tasks.updatedAt,
+          assigneeName: users.name,
+          assigneeEmail: users.email,
+          projectName: projects.name,
+        })
+        .from(tasks)
+        .leftJoin(users, eq(tasks.assigneeId, users.id))
+        .leftJoin(projects, eq(tasks.projectId, projects.id))
+        .where(inArray(tasks.assigneeId, teamMemberIds))
+        .orderBy(desc(tasks.updatedAt));
+
+      res.json(teamTasks);
+    } catch (error: any) {
+      console.error("Error fetching team tasks:", error);
+      res.status(500).json({ message: "Failed to fetch team tasks" });
+    }
+  });
+
   // Task validation routes (Manager only)
   app.post('/api/tasks/:taskId/validate', isAuthenticated, async (req: any, res) => {
     try {
@@ -537,47 +600,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Comment must be at least 10 characters' });
       }
 
-      // Get the current task
-      const [task] = await db
-        .select()
-        .from(tasks)
-        .where(eq(tasks.id, taskId))
-        .limit(1);
-
-      if (!task) {
-        return res.status(404).json({ message: 'Task not found' });
-      }
-
-      const oldPercentage = task.managerValidatedPercentage ?? task.progressPercentage;
-
-      // Update task with validation
-      await db
-        .update(tasks)
-        .set({
-          managerValidatedPercentage: newPercentage,
-          validatedBy: currentUser.id,
-          validatedAt: new Date(),
-          validationComment: validationComment.trim(),
-        })
-        .where(eq(tasks.id, taskId));
-
-      // Create audit trail entry
+      // Use transaction to ensure atomicity and prevent race conditions
       const { taskValidationHistory } = await import("@shared/schema");
-      await db.insert(taskValidationHistory).values({
-        taskId,
-        oldPercentage,
-        newPercentage,
-        validatedBy: currentUser.id,
-        validationComment: validationComment.trim(),
+      
+      // Transaction ensures both task update and history insert succeed together
+      const result = await db.transaction(async (tx) => {
+        // Lock the row and get current values atomically using FOR UPDATE
+        const [task] = await tx
+          .select({
+            id: tasks.id,
+            progressPercentage: tasks.progressPercentage,
+            managerValidatedPercentage: tasks.managerValidatedPercentage,
+          })
+          .from(tasks)
+          .where(eq(tasks.id, taskId))
+          .for('update')
+          .limit(1);
+
+        if (!task) {
+          throw new Error('Task not found');
+        }
+
+        // Capture the old percentage before update
+        const oldPercentage = task.managerValidatedPercentage ?? task.progressPercentage;
+
+        // Update task with validation
+        await tx
+          .update(tasks)
+          .set({
+            managerValidatedPercentage: newPercentage,
+            validatedBy: currentUser.id,
+            validatedAt: new Date(),
+            validationComment: validationComment.trim(),
+          })
+          .where(eq(tasks.id, taskId));
+
+        // Create audit trail entry within same transaction
+        await tx.insert(taskValidationHistory).values({
+          taskId: taskId,
+          oldPercentage: oldPercentage,
+          newPercentage: newPercentage,
+          validatedBy: currentUser.id,
+          validationComment: validationComment.trim(),
+        });
+
+        return { oldPercentage, newPercentage };
       });
 
       res.json({ 
         message: 'Task validation saved successfully',
-        oldPercentage,
-        newPercentage,
+        oldPercentage: result.oldPercentage,
+        newPercentage: result.newPercentage,
       });
     } catch (error: any) {
       console.error("Error validating task:", error);
+      if (error.message === 'Task not found') {
+        return res.status(404).json({ message: 'Task not found' });
+      }
       res.status(500).json({ message: "Failed to validate task" });
     }
   });
@@ -588,20 +667,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = req.params.taskId;
 
       const { taskValidationHistory } = await import("@shared/schema");
-      const history = await db
+      const historyRecords = await db
         .select({
           id: taskValidationHistory.id,
           oldPercentage: taskValidationHistory.oldPercentage,
           newPercentage: taskValidationHistory.newPercentage,
           validationComment: taskValidationHistory.validationComment,
           createdAt: taskValidationHistory.createdAt,
-          validatorName: users.name,
-          validatorEmail: users.email,
+          validatedBy: taskValidationHistory.validatedBy,
         })
         .from(taskValidationHistory)
-        .leftJoin(users, eq(taskValidationHistory.validatedBy, users.id))
         .where(eq(taskValidationHistory.taskId, taskId))
         .orderBy(desc(taskValidationHistory.createdAt));
+
+      // Enrich with validator user details
+      const history = await Promise.all(
+        historyRecords.map(async (record) => {
+          const validator = await db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, record.validatedBy))
+            .limit(1);
+          
+          return {
+            ...record,
+            validatorName: validator[0]?.name || 'Unknown',
+            validatorEmail: validator[0]?.email || '',
+          };
+        })
+      );
 
       res.json(history);
     } catch (error: any) {

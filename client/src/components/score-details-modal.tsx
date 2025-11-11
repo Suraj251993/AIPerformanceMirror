@@ -10,13 +10,14 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScoreCircle } from "@/components/score-circle";
 import { TaskValidationDialog } from "@/components/task-validation-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import type { Score, ScoreComponents, User } from "@shared/schema";
 import { motion } from "framer-motion";
-import { Calendar, CheckCircle2, Clock, Flag } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, Flag, Search } from "lucide-react";
 import { format } from "date-fns";
 
 interface ScoreDetailsModalProps {
@@ -54,6 +55,7 @@ interface UserTask {
 export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsModalProps) {
   const { user: currentUser } = useAuth();
   const [validatingTask, setValidatingTask] = useState<UserTask | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const { data, isLoading } = useQuery<ScoreDetailsData>({
     queryKey: ["/api/scores", userId],
@@ -66,6 +68,19 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
   });
 
   const canValidate = currentUser?.role === 'MANAGER';
+
+  // Filter tasks based on search query
+  const filteredTasks = tasks?.filter(task => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      task.title?.toLowerCase().includes(query) ||
+      task.description?.toLowerCase().includes(query) ||
+      task.projectName?.toLowerCase().includes(query) ||
+      task.status?.toLowerCase().includes(query) ||
+      task.priority?.toLowerCase().includes(query)
+    );
+  });
 
   const componentLabels = {
     taskCompletion: "Task Completion",
@@ -292,16 +307,29 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
               transition={{ duration: 0.4, delay: 0.4 }}
             >
               <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Tasks</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Tasks</h3>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search tasks..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-search-tasks"
+                    />
+                  </div>
+                </div>
                 {tasksLoading ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="h-24 bg-muted/20 rounded animate-pulse" />
                     ))}
                   </div>
-                ) : tasks && tasks.length > 0 ? (
+                ) : filteredTasks && filteredTasks.length > 0 ? (
                   <div className="space-y-3">
-                    {tasks.map((task, index) => (
+                    {filteredTasks.map((task, index) => (
                       <motion.div
                         key={task.id}
                         initial={{ opacity: 0, x: -20 }}
@@ -397,6 +425,12 @@ export function ScoreDetailsModal({ userId, open, onOpenChange }: ScoreDetailsMo
                         </div>
                       </motion.div>
                     ))}
+                  </div>
+                ) : searchQuery && tasks && tasks.length > 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No tasks match your search</p>
+                    <p className="text-sm mt-1">Try different keywords</p>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">

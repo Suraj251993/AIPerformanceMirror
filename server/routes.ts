@@ -6,7 +6,7 @@ import { insertFeedbackSchema } from "@shared/schema";
 import { seedMockData } from "./mockData";
 import { db } from "./db";
 import { users, feedback as feedbackTable, tasks, projects } from "@shared/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, ne } from "drizzle-orm";
 import { registerZohoRoutes } from "./zohoRoutes";
 
 // Helper function to get current user (respecting demo mode)
@@ -525,6 +525,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Get list of team members (employees who report to manager)
+  app.get('/api/manager/team-members', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await getCurrentUser(req);
+      
+      // Only managers and HR admins can access team members
+      if (currentUser?.role !== 'MANAGER' && currentUser?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden - Only Managers can access team members' });
+      }
+
+      // Get all employees assigned to this manager or all employees if HR admin
+      let teamMembers;
+      if (currentUser.role === 'HR_ADMIN') {
+        // HR Admin sees all employees
+        teamMembers = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            department: users.department,
+            role: users.role,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(ne(users.id, currentUser.id))
+          .orderBy(users.firstName);
+      } else {
+        // Manager sees their direct reports
+        teamMembers = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            department: users.department,
+            role: users.role,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(eq(users.managerId, currentUser.id))
+          .orderBy(users.firstName);
+      }
+
+      res.json(teamMembers);
+    } catch (error: any) {
+      console.error("Error fetching team members:", error);
+      res.status(500).json({ message: "Failed to fetch team members" });
+    }
+  });
+
+  // Get tasks for a specific team member
+  app.get('/api/manager/team-members/:employeeId/tasks', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = await getCurrentUser(req);
+      
+      // Only managers and HR admins can access team member tasks
+      if (currentUser?.role !== 'MANAGER' && currentUser?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden - Only Managers can access team member tasks' });
+      }
+
+      const employeeId = req.params.employeeId;
+
+      // Verify the employee reports to this manager (or manager is HR admin)
+      const [employee] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, employeeId))
+        .limit(1);
+
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      // If not HR admin, verify employee reports to this manager
+      if (currentUser.role !== 'HR_ADMIN' && employee.managerId !== currentUser.id) {
+        return res.status(403).json({ message: 'Forbidden - This employee does not report to you' });
+      }
+
+      // Get tasks for this specific employee
+      const employeeTasksRaw = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+          priority: tasks.priority,
+          assigneeId: tasks.assigneeId,
+          progressPercentage: tasks.progressPercentage,
+          managerValidatedPercentage: tasks.managerValidatedPercentage,
+          validatedBy: tasks.validatedBy,
+          validatedAt: tasks.validatedAt,
+          validationComment: tasks.validationComment,
+          dueDate: tasks.dueDate,
+          updatedAt: tasks.updatedAt,
+          projectName: projects.name,
+        })
+        .from(tasks)
+        .leftJoin(projects, eq(tasks.projectId, projects.id))
+        .where(eq(tasks.assigneeId, employeeId))
+        .orderBy(desc(tasks.updatedAt));
+
+      res.json(employeeTasksRaw);
+    } catch (error: any) {
+      console.error("Error fetching employee tasks:", error);
+      res.status(500).json({ message: "Failed to fetch employee tasks" });
     }
   });
 

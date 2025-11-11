@@ -6,7 +6,7 @@ import { insertFeedbackSchema } from "@shared/schema";
 import { seedMockData } from "./mockData";
 import { db } from "./db";
 import { users, feedback as feedbackTable, tasks, projects } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { registerZohoRoutes } from "./zohoRoutes";
 
 // Helper function to get current user (respecting demo mode)
@@ -26,8 +26,20 @@ async function getCurrentUser(req: any): Promise<any> {
   }
 
   // Otherwise return authenticated user
-  const userId = req.user.claims.sub;
-  return await storage.getUser(userId);
+  if (!req.user || !req.user.claims) {
+    return null;
+  }
+  
+  // Try to get user by OIDC subject first
+  let user = await storage.getUser(req.user.claims.sub);
+  
+  // If not found by sub, try looking up by email (for seeded demo users)
+  if (!user && req.user.claims.email) {
+    const allUsers = await storage.getAllUsers();
+    user = allUsers.find(u => u.email === req.user.claims.email);
+  }
+  
+  return user;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -546,8 +558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get tasks for team members using inArray
-      const { inArray } = await import("drizzle-orm");
-      const teamTasks = await db
+      const teamTasksRaw = await db
         .select({
           id: tasks.id,
           title: tasks.title,
@@ -562,7 +573,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           validationComment: tasks.validationComment,
           dueDate: tasks.dueDate,
           updatedAt: tasks.updatedAt,
-          assigneeName: users.name,
+          assigneeFirstName: users.firstName,
+          assigneeLastName: users.lastName,
           assigneeEmail: users.email,
           projectName: projects.name,
         })
@@ -571,6 +583,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(projects, eq(tasks.projectId, projects.id))
         .where(inArray(tasks.assigneeId, teamMemberIds))
         .orderBy(desc(tasks.updatedAt));
+      
+      // Format the response to combine first and last names
+      const teamTasks = teamTasksRaw.map(task => ({
+        ...task,
+        assigneeName: task.assigneeFirstName && task.assigneeLastName 
+          ? `${task.assigneeFirstName} ${task.assigneeLastName}`.trim()
+          : task.assigneeFirstName || task.assigneeLastName || 'Unknown',
+      }));
 
       res.json(teamTasks);
     } catch (error: any) {

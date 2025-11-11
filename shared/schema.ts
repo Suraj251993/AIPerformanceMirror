@@ -96,6 +96,10 @@ export const tasks = pgTable("tasks", {
   startDate: timestamp("start_date"),
   completedAt: timestamp("completed_at"),
   progressPercentage: integer("progress_percentage").default(0),
+  managerValidatedPercentage: integer("manager_validated_percentage"),
+  validatedBy: varchar("validated_by").references(() => users.id),
+  validatedAt: timestamp("validated_at"),
+  validationComment: text("validation_comment"),
   billingType: varchar("billing_type").default('none'),
   tags: text("tags").array(),
   createdBy: varchar("created_by").references(() => users.id),
@@ -117,8 +121,14 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     references: [users.id],
     relationName: "task_creator",
   }),
+  validator: one(users, {
+    fields: [tasks.validatedBy],
+    references: [users.id],
+    relationName: "task_validator",
+  }),
   timeLogs: many(timeLogs),
   taskOwners: many(taskOwners),
+  validationHistory: many(taskValidationHistory),
 }));
 
 export type Task = typeof tasks.$inferSelect;
@@ -146,6 +156,40 @@ export const taskOwnersRelations = relations(taskOwners, ({ one }) => ({
 
 export type TaskOwner = typeof taskOwners.$inferSelect;
 export type InsertTaskOwner = typeof taskOwners.$inferInsert;
+
+// Task Validation History table (audit trail for manager validations)
+export const taskValidationHistory = pgTable("task_validation_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  oldPercentage: integer("old_percentage").notNull(),
+  newPercentage: integer("new_percentage").notNull(),
+  validatedBy: varchar("validated_by").notNull().references(() => users.id),
+  validationComment: text("validation_comment").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const taskValidationHistoryRelations = relations(taskValidationHistory, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskValidationHistory.taskId],
+    references: [tasks.id],
+  }),
+  validator: one(users, {
+    fields: [taskValidationHistory.validatedBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertTaskValidationHistorySchema = createInsertSchema(taskValidationHistory).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  oldPercentage: z.number().min(0).max(100),
+  newPercentage: z.number().min(0).max(100),
+  validationComment: z.string().min(10, "Comment must be at least 10 characters").max(1000),
+});
+
+export type TaskValidationHistory = typeof taskValidationHistory.$inferSelect;
+export type InsertTaskValidationHistory = z.infer<typeof insertTaskValidationHistorySchema>;
 
 // Time logs table
 export const timeLogs = pgTable("time_logs", {

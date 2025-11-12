@@ -140,7 +140,7 @@ export default function DemoLogin() {
     {
       role: 'EMPLOYEE',
       title: 'Employee',
-      name: 'Jeeveetha P C K',
+      name: 'Neha Singh',
       description: 'Personal performance tracking and development insights.',
       icon: <User className="h-6 w-6 text-green-600" />,
       color: 'bg-green-600',

@@ -495,4 +495,96 @@ export function registerZohoRoutes(app: Express) {
       res.status(500).json({ message: 'Failed to update weekly schedule' });
     }
   });
+
+  app.get('/auth/zoho/login', async (req, res) => {
+    try {
+      const { zohoAuth } = await import('./services/zohoAuth.js');
+      const authUrl = zohoAuth.getAuthorizationUrl();
+      res.redirect(authUrl);
+    } catch (error: any) {
+      console.error('Error initiating Zoho SSO login:', error);
+      res.status(500).send('Failed to initiate Zoho login');
+    }
+  });
+
+  app.get('/auth/zoho/callback', async (req, res) => {
+    try {
+      const { code, error: oauthError } = req.query;
+
+      if (oauthError) {
+        console.error('OAuth error:', oauthError);
+        return res.redirect('/?error=oauth_failed');
+      }
+
+      if (!code) {
+        return res.redirect('/?error=missing_code');
+      }
+
+      const { zohoAuth } = await import('./services/zohoAuth.js');
+      const { zohoSync } = await import('./services/zohoSync.js');
+
+      const tokens = await zohoAuth.exchangeCodeForTokens(code as string);
+      
+      const idToken = zohoAuth.decodeIDToken(tokens.access_token);
+
+      let user = await storage.getUserByZohoId(idToken.sub);
+
+      if (!user) {
+        const tempUserId = crypto.randomBytes(16).toString('hex');
+        
+        await zohoAuth.storeTokens(tempUserId, tokens, tokens.scope || 'openid,profile,email');
+        
+        user = await zohoSync.syncUserFromZoho(
+          tempUserId,
+          idToken.sub,
+          idToken.email,
+          idToken.name || `${idToken.given_name} ${idToken.family_name}`
+        );
+
+        await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
+      } else {
+        await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
+      }
+
+      req.session.userId = user.id;
+      req.session.authSource = 'zoho';
+      
+      res.redirect('/');
+    } catch (error: any) {
+      console.error('Error in Zoho SSO callback:', error);
+      res.redirect('/?error=auth_failed');
+    }
+  });
+
+  app.post('/api/zoho/sync-employees', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'HR_ADMIN') {
+        return res.status(403).json({ message: 'Only HR admins can sync employees' });
+      }
+
+      const { zohoSync } = await import('./services/zohoSync.js');
+      const result = await zohoSync.syncAllEmployeesFromZoho(userId);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error syncing employees:', error);
+      res.status(500).json({ 
+        message: 'Failed to sync employees', 
+        error: error.message 
+      });
+    }
+  });
+
+  app.get('/api/zoho/sync-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const logs = await storage.getSyncLogs(10);
+      res.json(logs);
+    } catch (error: any) {
+      console.error('Error fetching sync logs:', error);
+      res.status(500).json({ message: 'Failed to fetch sync logs' });
+    }
+  });
 }

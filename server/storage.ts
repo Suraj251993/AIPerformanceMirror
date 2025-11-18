@@ -82,6 +82,10 @@ export interface IStorage {
   getReportSubscription(userId: string): Promise<{ dailyEnabled: boolean; weeklyEnabled: boolean } | undefined>;
   upsertReportSubscription(userId: string, settings: { dailyEnabled: boolean; weeklyEnabled: boolean }): Promise<{ dailyEnabled: boolean; weeklyEnabled: boolean }>;
   getReportDeliveryLog(userId: string, limit?: number): Promise<ReportDelivery[]>;
+  
+  // Zoho SSO operations
+  getUserByZohoId(zohoUserId: string): Promise<User | undefined>;
+  getSyncLogs(limit?: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -119,6 +123,17 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+
+  async getUserByZohoId(zohoUserId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.zohoUserId, zohoUserId));
+    return user;
+  }
+
+  async getSyncLogs(limit: number = 10): Promise<any[]> {
+    const { syncLogs } = await import("@shared/schema");
+    const logs = await db.select().from(syncLogs).orderBy(desc(syncLogs.createdAt)).limit(limit);
+    return logs;
   }
 
   // Project operations

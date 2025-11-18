@@ -28,7 +28,10 @@ export const sessions = pgTable(
 // User roles enum
 export type UserRole = 'HR_ADMIN' | 'MANAGER' | 'EMPLOYEE';
 
-// Users table - Extended for Replit Auth + Performance Mirror
+// Authentication source enum
+export type AuthSource = 'demo' | 'zoho' | 'replit';
+
+// Users table - Extended for Replit Auth + Performance Mirror + Zoho SSO
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
@@ -38,6 +41,21 @@ export const users = pgTable("users", {
   role: varchar("role", { length: 20 }).$type<UserRole | null>(),
   department: varchar("department"),
   managerId: varchar("manager_id"),
+  
+  // Authentication source tracking
+  authSource: varchar("auth_source", { length: 20 }).$type<AuthSource>().default('demo'),
+  
+  // Zoho-specific fields
+  zohoUserId: varchar("zoho_user_id", { length: 255 }),
+  zohoEmail: varchar("zoho_email", { length: 255 }),
+  zohoEmployeeId: varchar("zoho_employee_id", { length: 100 }),
+  zohoRecordId: varchar("zoho_record_id", { length: 100 }),
+  zohoProfilePicture: text("zoho_profile_picture"),
+  
+  // Sync tracking
+  lastZohoSync: timestamp("last_zoho_sync"),
+  zohoSyncStatus: varchar("zoho_sync_status", { length: 20 }).default('pending'),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -58,6 +76,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   feedbackReceived: many(feedback, { relationName: "feedback_to" }),
   scores: many(scores),
   auditLogs: many(auditLogs),
+  zohoConnections: many(zohoConnections),
 }));
 
 export type UpsertUser = typeof users.$inferInsert;
@@ -338,7 +357,10 @@ export const zohoConnections = pgTable("zoho_connections", {
   refreshToken: text("refresh_token").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   scope: varchar("scope").notNull(),
+  tokenType: varchar("token_type", { length: 50 }).default('Bearer'),
   zohoOrgId: varchar("zoho_org_id"),
+  zohoDataCenter: varchar("zoho_data_center", { length: 10 }).default('com'),
+  apiDomain: varchar("api_domain", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

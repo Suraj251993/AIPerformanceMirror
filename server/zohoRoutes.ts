@@ -546,31 +546,32 @@ export function registerZohoRoutes(app: Express) {
       const { zohoAuth } = await import('./services/zohoAuth.js');
       const { zohoSync } = await import('./services/zohoSync.js');
 
+      console.log('🔄 Exchanging authorization code for tokens...');
       const tokens = await zohoAuth.exchangeCodeForTokens(codeParam);
       
-      if (!tokens.id_token) {
-        console.error('❌ No ID token received from Zoho. Token response:', tokens);
-        return res.redirect('/?error=no_id_token');
-      }
-      
-      const idToken = zohoAuth.decodeIDToken(tokens.id_token);
+      console.log('🔄 Fetching user information from Zoho...');
+      const userInfo = await zohoAuth.getUserInfo(tokens.access_token);
 
-      let user = await storage.getUserByZohoId(idToken.sub);
+      console.log('🔄 Looking up user by Zoho ID:', userInfo.sub);
+      let user = await storage.getUserByZohoId(userInfo.sub);
 
       if (!user) {
+        console.log('✨ First-time Zoho login - creating new user...');
         const tempUserId = crypto.randomBytes(16).toString('hex');
         
         await zohoAuth.storeTokens(tempUserId, tokens, tokens.scope || 'openid,profile,email');
         
         user = await zohoSync.syncUserFromZoho(
           tempUserId,
-          idToken.sub,
-          idToken.email,
-          idToken.name || `${idToken.given_name} ${idToken.family_name}`
+          userInfo.sub,
+          userInfo.email,
+          userInfo.name || `${userInfo.given_name} ${userInfo.family_name}`
         );
 
         await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
+        console.log('✅ New user created:', { id: user.id, email: user.email });
       } else {
+        console.log('✅ Existing user found:', { id: user.id, email: user.email });
         await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
       }
 

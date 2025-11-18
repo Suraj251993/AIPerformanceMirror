@@ -143,6 +143,41 @@ export class ZohoAuthService {
     }
   }
 
+  async getUserInfo(accessToken: string): Promise<ZohoIDToken> {
+    try {
+      console.log('🔍 Fetching user info from Zoho UserInfo endpoint...');
+      const response = await axios.get(
+        `${this.getAccountsUrl()}/oauth/v2/user/info`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      console.log('✅ Received user info from Zoho:', {
+        has_email: !!response.data.Email,
+        has_name: !!response.data.Display_Name,
+        zuid: response.data.ZUID
+      });
+
+      return {
+        sub: response.data.ZUID,
+        email: response.data.Email,
+        name: response.data.Display_Name || response.data.Full_Name,
+        given_name: response.data.First_Name,
+        family_name: response.data.Last_Name,
+        picture: response.data.profile_image,
+        iss: this.getAccountsUrl(),
+        aud: this.clientId,
+        exp: Date.now() + 3600000,
+      };
+    } catch (error: any) {
+      console.error('❌ Error fetching user info:', error.response?.data || error.message);
+      throw new Error(`Failed to fetch user info: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
   decodeIDToken(idToken: string): ZohoIDToken {
     try {
       const parts = idToken.split('.');

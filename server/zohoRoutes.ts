@@ -516,12 +516,23 @@ export function registerZohoRoutes(app: Express) {
   });
 
   app.get('/auth/zoho/callback', async (req: any, res) => {
-    console.error('🎯 === ZOHO CALLBACK STARTED (ERROR LOG) ===');
-    process.stdout.write('🎯 === ZOHO CALLBACK STARTED (STDOUT) ===\n');
-    console.log('🎯 === ZOHO CALLBACK STARTED ===');
-    console.log('Query params:', req.query);
-    console.log('Session exists:', !!req.session);
-    console.log('Session oauthState:', req.session?.oauthState);
+    const fs = await import('fs');
+    const debugLog = (msg: string) => {
+      const timestamp = new Date().toISOString();
+      const logMsg = `[${timestamp}] ${msg}\n`;
+      console.error(msg);
+      console.log(msg);
+      try {
+        fs.appendFileSync('/tmp/zoho-callback-debug.log', logMsg);
+      } catch (e) {
+        // Ignore file write errors
+      }
+    };
+    
+    debugLog('🎯 === ZOHO CALLBACK STARTED ===');
+    debugLog(`Query params: ${JSON.stringify(req.query)}`);
+    debugLog(`Session exists: ${!!req.session}`);
+    debugLog(`Session oauthState: ${req.session?.oauthState}`);
     
     try {
       const { code, state, error: oauthError } = req.query;
@@ -601,10 +612,19 @@ export function registerZohoRoutes(app: Express) {
       
       res.redirect('/');
     } catch (error: any) {
-      console.error('❌❌❌ ERROR IN ZOHO SSO CALLBACK ❌❌❌');
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-      console.error('Full error:', error);
+      const fs = await import('fs');
+      const errorMsg = `
+❌❌❌ ERROR IN ZOHO SSO CALLBACK ❌❌❌
+Error message: ${error.message}
+Error stack: ${error.stack}
+Full error: ${JSON.stringify(error, null, 2)}
+`;
+      console.error(errorMsg);
+      try {
+        fs.appendFileSync('/tmp/zoho-callback-debug.log', `[${new Date().toISOString()}] ${errorMsg}\n`);
+      } catch (e) {
+        // Ignore file write errors
+      }
       res.redirect('/?error=auth_failed');
     }
   });

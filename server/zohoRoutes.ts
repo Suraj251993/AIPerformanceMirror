@@ -516,17 +516,11 @@ export function registerZohoRoutes(app: Express) {
   });
 
   app.get('/auth/zoho/callback', async (req: any, res) => {
-    // CRITICAL: Write to file IMMEDIATELY to prove route is hit
-    const fs = require('fs');
-    const timestamp = new Date().toISOString();
-    const logEntry = `\n[${timestamp}] CALLBACK HIT - Query: ${JSON.stringify(req.query)}\n`;
-    try {
-      fs.appendFileSync('/tmp/zoho-debug.txt', logEntry);
-    } catch (e) { /* ignore */ }
-    
-    console.log('🎯🎯🎯 === ZOHO CALLBACK HIT === 🎯🎯🎯');
-    console.log('Query:', req.query);
-    console.log('Session:', req.session);
+    console.error('🔥🔥🔥 ZOHO CALLBACK ROUTE HIT 🔥🔥🔥');
+    console.error('Query params:', JSON.stringify(req.query));
+    console.error('Session exists:', !!req.session);
+    console.error('Session ID:', req.session?.id);
+    console.error('OAuth state in session:', req.session?.oauthState);
     
     try {
       const { code, state, error: oauthError } = req.query;

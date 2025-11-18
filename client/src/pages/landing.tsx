@@ -66,28 +66,28 @@ export default function Landing() {
             className="pt-8 space-y-6"
           >
             <div className="space-y-4">
-              <Button
-                size="lg"
-                onClick={() => window.location.href = '/auth/zoho/login'}
-                data-testid="button-zoho-login"
-                className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto"
-              >
-                Sign in with Zoho
-              </Button>
+              <a href="/auth/zoho/login" className="block" data-testid="link-zoho-login">
+                <Button
+                  size="lg"
+                  className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto"
+                >
+                  Sign in with Zoho
+                </Button>
+              </a>
               <div className="flex items-center gap-4 justify-center">
                 <div className="h-px bg-border flex-1 max-w-[100px]" />
                 <span className="text-sm text-muted-foreground">or</span>
                 <div className="h-px bg-border flex-1 max-w-[100px]" />
               </div>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => window.location.href = '/api/login'}
-                data-testid="button-demo-login"
-                className="text-lg px-8 py-6 w-full md:w-auto"
-              >
-                Try Demo Mode
-              </Button>
+              <a href="/api/login" className="block" data-testid="link-demo-login">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-lg px-8 py-6 w-full md:w-auto"
+                >
+                  Try Demo Mode
+                </Button>
+              </a>
             </div>
             <p className="text-sm text-muted-foreground">
               Track, analyze, and improve team performance

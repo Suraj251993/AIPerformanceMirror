@@ -64,7 +64,7 @@ export class ZohoAuthService {
     return `https://${dcMap[this.dataCenter] || dcMap['com']}`;
   }
 
-  getAuthorizationUrl(): string {
+  getAuthorizationUrl(state: string): string {
     const scopes = [
       'openid',
       'profile',
@@ -80,6 +80,7 @@ export class ZohoAuthService {
       access_type: 'offline',
       redirect_uri: this.redirectUri,
       prompt: 'consent',
+      state: state,
     });
 
     return `${this.getAccountsUrl()}/oauth/v2/auth?${params.toString()}`;

@@ -496,10 +496,14 @@ export function registerZohoRoutes(app: Express) {
     }
   });
 
-  app.get('/auth/zoho/login', async (req, res) => {
+  app.get('/auth/zoho/login', async (req: any, res) => {
     try {
+      const state = crypto.randomBytes(32).toString('hex');
+      
+      req.session.oauthState = state;
+      
       const { zohoAuth } = await import('./services/zohoAuth.js');
-      const authUrl = zohoAuth.getAuthorizationUrl();
+      const authUrl = zohoAuth.getAuthorizationUrl(state);
       res.redirect(authUrl);
     } catch (error: any) {
       console.error('Error initiating Zoho SSO login:', error);
@@ -507,18 +511,37 @@ export function registerZohoRoutes(app: Express) {
     }
   });
 
-  app.get('/auth/zoho/callback', async (req, res) => {
+  app.get('/auth/zoho/callback', async (req: any, res) => {
     try {
-      const { code, error: oauthError } = req.query;
+      const { code, state, error: oauthError } = req.query;
 
       if (oauthError) {
         console.error('OAuth error:', oauthError);
         return res.redirect('/?error=oauth_failed');
       }
 
-      if (!code) {
-        return res.redirect('/?error=missing_code');
+      const stateParam = Array.isArray(state) ? state[0] : state;
+      const codeParam = Array.isArray(code) ? code[0] : code;
+
+      if (!codeParam || !stateParam) {
+        return res.redirect('/?error=missing_parameters');
       }
+
+      if (!req.session || stateParam !== req.session.oauthState) {
+        console.error('OAuth state mismatch or missing session - potential CSRF attack');
+        if (req.session) {
+          delete req.session.oauthState;
+        }
+        return res.redirect('/?error=invalid_state');
+      }
+
+      delete req.session.oauthState;
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
 
       const { zohoAuth } = await import('./services/zohoAuth.js');
       const { zohoSync } = await import('./services/zohoSync.js');

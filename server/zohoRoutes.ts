@@ -546,9 +546,14 @@ export function registerZohoRoutes(app: Express) {
       const { zohoAuth } = await import('./services/zohoAuth.js');
       const { zohoSync } = await import('./services/zohoSync.js');
 
-      const tokens = await zohoAuth.exchangeCodeForTokens(code as string);
+      const tokens = await zohoAuth.exchangeCodeForTokens(codeParam);
       
-      const idToken = zohoAuth.decodeIDToken(tokens.access_token);
+      if (!tokens.id_token) {
+        console.error('❌ No ID token received from Zoho. Token response:', tokens);
+        return res.redirect('/?error=no_id_token');
+      }
+      
+      const idToken = zohoAuth.decodeIDToken(tokens.id_token);
 
       let user = await storage.getUserByZohoId(idToken.sub);
 

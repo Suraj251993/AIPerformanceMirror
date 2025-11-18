@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 interface ZohoTokenResponse {
   access_token: string;
   refresh_token: string;
+  id_token?: string;
   expires_in: number;
   token_type: string;
   api_domain: string;
@@ -103,6 +104,13 @@ export class ZohoAuthService {
           },
         }
       );
+
+      console.log('✅ Received tokens from Zoho:', { 
+        has_access_token: !!response.data.access_token,
+        has_id_token: !!response.data.id_token,
+        has_refresh_token: !!response.data.refresh_token,
+        scope: response.data.scope 
+      });
 
       return response.data;
     } catch (error: any) {

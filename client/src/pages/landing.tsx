@@ -70,9 +70,9 @@ export default function Landing() {
               <a href="/auth/zoho/login" className="block" data-testid="link-zoho-login">
                 <Button
                   size="lg"
-                  className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto flex items-center gap-3"
+                  className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto flex items-center justify-center gap-3"
                 >
-                  <img src={zohoLogo} alt="Zoho" className="w-6 h-6" />
+                  <img src={zohoLogo} alt="Zoho" className="w-8 h-8" />
                   Sign in with Zoho
                 </Button>
               </a>

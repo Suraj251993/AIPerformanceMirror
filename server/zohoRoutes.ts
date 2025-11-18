@@ -512,23 +512,34 @@ export function registerZohoRoutes(app: Express) {
   });
 
   app.get('/auth/zoho/callback', async (req: any, res) => {
+    console.log('🎯 === ZOHO CALLBACK STARTED ===');
+    console.log('Query params:', req.query);
+    console.log('Session exists:', !!req.session);
+    console.log('Session oauthState:', req.session?.oauthState);
+    
     try {
       const { code, state, error: oauthError } = req.query;
 
       if (oauthError) {
-        console.error('OAuth error:', oauthError);
+        console.error('❌ OAuth error from Zoho:', oauthError);
         return res.redirect('/?error=oauth_failed');
       }
 
       const stateParam = Array.isArray(state) ? state[0] : state;
       const codeParam = Array.isArray(code) ? code[0] : code;
 
+      console.log('State param:', stateParam);
+      console.log('Code param:', codeParam ? 'exists' : 'missing');
+
       if (!codeParam || !stateParam) {
+        console.error('❌ Missing code or state parameter');
         return res.redirect('/?error=missing_parameters');
       }
 
       if (!req.session || stateParam !== req.session.oauthState) {
-        console.error('OAuth state mismatch or missing session - potential CSRF attack');
+        console.error('❌ OAuth state mismatch or missing session - potential CSRF attack');
+        console.error('Expected state:', req.session?.oauthState);
+        console.error('Received state:', stateParam);
         if (req.session) {
           delete req.session.oauthState;
         }
@@ -578,9 +589,16 @@ export function registerZohoRoutes(app: Express) {
       req.session.userId = user.id;
       req.session.authSource = 'zoho';
       
+      console.log('🎉 === ZOHO LOGIN SUCCESSFUL ===');
+      console.log('User ID:', user.id);
+      console.log('User email:', user.email);
+      
       res.redirect('/');
     } catch (error: any) {
-      console.error('Error in Zoho SSO callback:', error);
+      console.error('❌❌❌ ERROR IN ZOHO SSO CALLBACK ❌❌❌');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('Full error:', error);
       res.redirect('/?error=auth_failed');
     }
   });

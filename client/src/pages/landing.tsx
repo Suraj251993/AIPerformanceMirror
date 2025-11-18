@@ -63,17 +63,33 @@ export default function Landing() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.8 }}
-            className="pt-8"
+            className="pt-8 space-y-6"
           >
-            <Button
-              size="lg"
-              onClick={() => window.location.href = '/api/login'}
-              data-testid="button-login"
-              className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow"
-            >
-              Sign In to Continue
-            </Button>
-            <p className="text-sm text-muted-foreground mt-4">
+            <div className="space-y-4">
+              <Button
+                size="lg"
+                onClick={() => window.location.href = '/auth/zoho/login'}
+                data-testid="button-zoho-login"
+                className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto"
+              >
+                Sign in with Zoho
+              </Button>
+              <div className="flex items-center gap-4 justify-center">
+                <div className="h-px bg-border flex-1 max-w-[100px]" />
+                <span className="text-sm text-muted-foreground">or</span>
+                <div className="h-px bg-border flex-1 max-w-[100px]" />
+              </div>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => window.location.href = '/api/login'}
+                data-testid="button-demo-login"
+                className="text-lg px-8 py-6 w-full md:w-auto"
+              >
+                Try Demo Mode
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
               Track, analyze, and improve team performance
             </p>
           </motion.div>

@@ -11,6 +11,7 @@ import {
   sprintItems,
   reportSubscriptions,
   reportDeliveryLog,
+  syncLogs,
   type User,
   type UpsertUser,
   type Project,
@@ -131,7 +132,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSyncLogs(limit: number = 10): Promise<any[]> {
-    const { syncLogs } = await import("@shared/schema");
     const logs = await db.select().from(syncLogs).orderBy(desc(syncLogs.createdAt)).limit(limit);
     return logs;
   }

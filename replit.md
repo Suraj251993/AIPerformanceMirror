@@ -75,6 +75,44 @@ A manager validation workflow allowing managers to review and adjust employee-re
 **Known Limitations:**
 - Auth reconciliation between OIDC subject IDs and seeded demo user IDs needs deeper integration across all routes for production OIDC use. Feature currently works fully with demo mode (hardcoded employee IDs).
 
+### Zoho People SSO Integration (Phase 2 - November 2025)
+Hybrid authentication system allowing users to login via either Demo mode (existing) or Zoho People Single Sign-On, maintaining 100% feature parity across both authentication methods.
+
+**Key Components:**
+- **Database Schema Extensions**: Extended `users` table with `authSource` (enum: 'demo'/'zoho'), `zohoUserId`, `zohoEmail`, and `lastZohoSyncAt` columns. Created `sync_logs` table for tracking employee synchronization history.
+- **Backend Services**:
+  - `server/services/zohoAuth.ts`: OAuth 2.0 + OpenID Connect handler for Zoho People, token management with refresh, and ID token decoding.
+  - `server/services/zohoPeople.ts`: Zoho People API client for fetching employee data with pagination and rate limiting.
+  - `server/services/zohoSync.ts`: Employee data synchronization service with role auto-assignment (MANAGER if employee has direct reports), department mapping, and manager hierarchy sync.
+- **Backend Routes** (in `server/zohoRoutes.ts`):
+  - GET `/auth/zoho/login` - Initiates Zoho SSO OAuth flow
+  - GET `/auth/zoho/callback` - Handles OAuth callback, creates/updates user, and establishes session
+  - POST `/api/zoho/sync-employees` - Manual employee sync trigger (HR_ADMIN only)
+  - GET `/api/zoho/sync-status` - Retrieves recent sync logs
+- **Frontend Components**:
+  - Updated `client/src/pages/landing.tsx` with dual authentication options: "Sign in with Zoho" (primary) and "Try Demo Mode" (secondary)
+  - Existing role-based routing and dashboards work identically for both Zoho SSO and Demo users
+- **Storage Extensions**: Added `getUserByZohoId()` and `getSyncLogs()` methods to storage interface for Zoho user lookups and sync history tracking.
+
+**Authentication Flow:**
+1. User lands on Landing page → Chooses "Sign in with Zoho" or "Try Demo Mode"
+2. Zoho SSO path: Redirects to `/auth/zoho/login` → Zoho OAuth consent → `/auth/zoho/callback` → User sync → Session created → Dashboard
+3. Demo mode path: Redirects to `/api/login` → Demo role selection → Session created → Dashboard
+4. First-time Zoho users: Automatically created in database with data from Zoho People (name, email, department, manager, profile picture)
+5. Returning Zoho users: Session established with existing user record
+
+**Design Principles:**
+- Parallel authentication paths: Demo and Zoho SSO coexist without interference
+- Feature parity: All features (dashboards, validation, reports, analytics) work identically regardless of auth method
+- Real-time sync: Employee data synced on first login, with optional scheduled daily full sync
+- Auto-role assignment: MANAGER role granted if employee has direct reports in Zoho People
+- Secure token storage: Zoho OAuth tokens stored in `zoho_connections` table with expiry tracking
+
+**Configuration Requirements:**
+- Environment variables: `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REDIRECT_URI`
+- Zoho API Console setup: OAuth app registration with People API scopes (openid, profile, email, ZohoPeople.employee.READ)
+- See `ZOHO_SETUP_GUIDE.md` for complete setup instructions
+
 **Key Libraries**
 - `@tanstack/react-query`: Server state management
 - `drizzle-orm`: Type-safe database operations

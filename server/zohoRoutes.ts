@@ -246,7 +246,7 @@ export function registerZohoRoutes(app: Express) {
       }
 
       const weights = req.body;
-      const total = Object.values(weights).reduce((sum: any, val: any) => sum + (Number(val) || 0), 0);
+      const total: number = Object.values(weights).reduce((sum: any, val: any) => sum + (Number(val) || 0), 0);
       
       if (Math.abs(total - 100) > 0.01) {
         return res.status(400).json({ message: 'Weights must sum to 100%' });

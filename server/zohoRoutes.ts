@@ -506,7 +506,7 @@ export function registerZohoRoutes(app: Express) {
       
       req.session.oauthState = state;
       
-      const { zohoAuth } = await import('./services/zohoAuth.js');
+      const { zohoAuth } = await import('./services/zohoAuth');
       const authUrl = zohoAuth.getAuthorizationUrl(state);
       res.redirect(authUrl);
     } catch (error: any) {
@@ -562,8 +562,8 @@ export function registerZohoRoutes(app: Express) {
         });
       });
 
-      const { zohoAuth } = await import('./services/zohoAuth.js');
-      const { zohoSync } = await import('./services/zohoSync.js');
+      const { zohoAuth } = await import('./services/zohoAuth');
+      const { zohoSync } = await import('./services/zohoSync');
 
       console.log('🔄 Exchanging code for tokens...');
       const tokens = await zohoAuth.exchangeCodeForTokens(codeParam);
@@ -616,7 +616,7 @@ export function registerZohoRoutes(app: Express) {
         return res.status(403).json({ message: 'Only HR admins can sync employees' });
       }
 
-      const { zohoSync } = await import('./services/zohoSync.js');
+      const { zohoSync } = await import('./services/zohoSync');
       const result = await zohoSync.syncAllEmployeesFromZoho(userId);
 
       res.json(result);

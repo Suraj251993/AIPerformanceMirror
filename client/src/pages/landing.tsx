@@ -66,26 +66,26 @@ export default function Landing() {
             transition={{ duration: 0.5, delay: 0.8 }}
             className="pt-8 space-y-6"
           >
-            <div className="space-y-4">
-              <a href="/auth/zoho/login" className="block" data-testid="link-zoho-login">
+            <div className="space-y-4 flex flex-col items-center">
+              <a href="/auth/zoho/login" data-testid="link-zoho-login">
                 <Button
                   size="lg"
-                  className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto flex items-center justify-center gap-3"
+                  className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center gap-3"
                 >
                   <img src={zohoLogo} alt="Zoho" className="w-8 h-8" />
                   Sign in with Zoho
                 </Button>
               </a>
-              <div className="flex items-center gap-4 justify-center">
+              <div className="flex items-center gap-4 justify-center w-full">
                 <div className="h-px bg-border flex-1 max-w-[100px]" />
                 <span className="text-sm text-muted-foreground">or</span>
                 <div className="h-px bg-border flex-1 max-w-[100px]" />
               </div>
-              <a href="/api/login" className="block" data-testid="link-demo-login">
+              <a href="/api/login" data-testid="link-demo-login">
                 <Button
                   size="lg"
                   variant="outline"
-                  className="text-lg px-8 py-6 w-full md:w-auto"
+                  className="text-lg px-8 py-6"
                 >
                   Try Demo Mode
                 </Button>

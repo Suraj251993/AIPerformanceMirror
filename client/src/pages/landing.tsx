@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, Users, Award } from "lucide-react";
 import { motion } from "framer-motion";
+import zohoLogo from "@assets/zoho-logo.png";
 
 export default function Landing() {
   return (
@@ -69,8 +70,9 @@ export default function Landing() {
               <a href="/auth/zoho/login" className="block" data-testid="link-zoho-login">
                 <Button
                   size="lg"
-                  className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto"
+                  className="text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow w-full md:w-auto flex items-center gap-3"
                 >
+                  <img src={zohoLogo} alt="Zoho" className="w-6 h-6" />
                   Sign in with Zoho
                 </Button>
               </a>

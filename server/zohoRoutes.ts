@@ -250,7 +250,7 @@ export function registerZohoRoutes(app: Express) {
       }
 
       const weights = req.body;
-      const total: number = Object.values(weights).reduce((sum: any, val: any) => sum + (Number(val) || 0), 0);
+      const total: number = Object.values(weights).reduce((sum, val) => Number(sum) + (Number(val) || 0), 0) as number;
       
       if (Math.abs(total - 100) > 0.01) {
         return res.status(400).json({ message: 'Weights must sum to 100%' });
@@ -515,33 +515,21 @@ export function registerZohoRoutes(app: Express) {
     }
   });
 
-  app.get('/auth/zoho/callback', (req: any, res) => {
-    // SYNCHRONOUS log that MUST appear
-    process.stderr.write('🎯🎯🎯 CALLBACK HIT 🎯🎯🎯\n');
+  app.get('/auth/zoho/callback', async (req: any, res) => {
+    // CRITICAL: Write to file IMMEDIATELY to prove route is hit
+    const fs = require('fs');
+    const timestamp = new Date().toISOString();
+    const logEntry = `\n[${timestamp}] CALLBACK HIT - Query: ${JSON.stringify(req.query)}\n`;
+    try {
+      fs.appendFileSync('/tmp/zoho-debug.txt', logEntry);
+    } catch (e) { /* ignore */ }
     
-    // Continue with async handling
-    (async () => {
-      try {
-        const fs = await import('fs');
-        const debugLog = (msg: string) => {
-          const timestamp = new Date().toISOString();
-          const logMsg = `[${timestamp}] ${msg}\n`;
-          console.error(msg);
-          console.log(msg);
-          process.stderr.write(msg + '\n');
-          try {
-            fs.appendFileSync('/tmp/zoho-callback-debug.log', logMsg);
-          } catch (e) {
-            // Ignore file write errors
-          }
-        };
-        
-        debugLog('🎯 === ZOHO CALLBACK STARTED ===');
-        debugLog(`Query params: ${JSON.stringify(req.query)}`);
-        debugLog(`Session exists: ${!!req.session}`);
-        debugLog(`Session oauthState: ${req.session?.oauthState}`);
-        
-        const { code, state, error: oauthError } = req.query;
+    console.log('🎯🎯🎯 === ZOHO CALLBACK HIT === 🎯🎯🎯');
+    console.log('Query:', req.query);
+    console.log('Session:', req.session);
+    
+    try {
+      const { code, state, error: oauthError } = req.query;
 
       if (oauthError) {
         console.error('❌ OAuth error from Zoho:', oauthError);
@@ -554,91 +542,69 @@ export function registerZohoRoutes(app: Express) {
       console.log('State param:', stateParam);
       console.log('Code param:', codeParam ? 'exists' : 'missing');
 
-        if (!codeParam || !stateParam) {
-          console.error('❌ Missing code or state parameter');
-          return res.redirect('/?error=missing_parameters');
-        }
-
-        if (!req.session || stateParam !== req.session.oauthState) {
-          console.error('❌ OAuth state mismatch or missing session - potential CSRF attack');
-          console.error('Expected state:', req.session?.oauthState);
-          console.error('Received state:', stateParam);
-          if (req.session) {
-            delete req.session.oauthState;
-          }
-          return res.redirect('/?error=invalid_state');
-        }
-
-        delete req.session.oauthState;
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err: any) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-
-        const { zohoAuth } = await import('./services/zohoAuth.js');
-        const { zohoSync } = await import('./services/zohoSync.js');
-
-        console.log('🔄 Exchanging authorization code for tokens...');
-        const tokens = await zohoAuth.exchangeCodeForTokens(codeParam);
-        
-        console.log('🔄 Fetching user information from Zoho...');
-        const userInfo = await zohoAuth.getUserInfo(tokens.access_token);
-
-        console.log('🔄 Looking up user by Zoho ID:', userInfo.sub);
-        let user = await storage.getUserByZohoId(userInfo.sub);
-
-        if (!user) {
-          console.log('✨ First-time Zoho login - creating new user...');
-          const tempUserId = crypto.randomBytes(16).toString('hex');
-          
-          await zohoAuth.storeTokens(tempUserId, tokens, tokens.scope || 'openid,profile,email');
-          
-          user = await zohoSync.syncUserFromZoho(
-            tempUserId,
-            userInfo.sub,
-            userInfo.email,
-            userInfo.name || `${userInfo.given_name} ${userInfo.family_name}`
-          );
-
-          await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
-          console.log('✅ New user created:', { id: user.id, email: user.email });
-        } else {
-          console.log('✅ Existing user found:', { id: user.id, email: user.email });
-          await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
-        }
-
-        req.session.userId = user.id;
-        req.session.authSource = 'zoho';
-        
-        console.log('🎉 === ZOHO LOGIN SUCCESSFUL ===');
-        console.log('User ID:', user.id);
-        console.log('User email:', user.email);
-        
-        res.redirect('/');
-      } catch (error: any) {
-        const fs = await import('fs');
-        const errorMsg = `
-❌❌❌ ERROR IN ZOHO SSO CALLBACK ❌❌❌
-Error message: ${error.message}
-Error stack: ${error.stack}
-Full error: ${JSON.stringify(error, null, 2)}
-`;
-        console.error(errorMsg);
-        process.stderr.write(errorMsg + '\n');
-        try {
-          fs.appendFileSync('/tmp/zoho-callback-debug.log', `[${new Date().toISOString()}] ${errorMsg}\n`);
-        } catch (e) {
-          // Ignore file write errors
-        }
-        res.redirect('/?error=auth_failed');
+      if (!codeParam || !stateParam) {
+        console.error('❌ Missing code or state parameter');
+        return res.redirect('/?error=missing_parameters');
       }
-    })().catch(err => {
-      console.error('FATAL ERROR IN CALLBACK:', err);
-      process.stderr.write('FATAL ERROR IN CALLBACK: ' + err.message + '\n');
+
+      if (!req.session || stateParam !== req.session.oauthState) {
+        console.error('❌ OAuth state mismatch or missing session');
+        console.error('Expected:', req.session?.oauthState);
+        console.error('Received:', stateParam);
+        return res.redirect('/?error=invalid_state');
+      }
+
+      delete req.session.oauthState;
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      const { zohoAuth } = await import('./services/zohoAuth.js');
+      const { zohoSync } = await import('./services/zohoSync.js');
+
+      console.log('🔄 Exchanging code for tokens...');
+      const tokens = await zohoAuth.exchangeCodeForTokens(codeParam);
+      
+      console.log('🔄 Fetching user info...');
+      const userInfo = await zohoAuth.getUserInfo(tokens.access_token);
+
+      console.log('🔄 Looking up user:', userInfo.sub);
+      let user = await storage.getUserByZohoId(userInfo.sub);
+
+      if (!user) {
+        console.log('✨ Creating new user...');
+        const tempUserId = crypto.randomBytes(16).toString('hex');
+        
+        await zohoAuth.storeTokens(tempUserId, tokens, tokens.scope || 'openid,profile,email');
+        
+        user = await zohoSync.syncUserFromZoho(
+          tempUserId,
+          userInfo.sub,
+          userInfo.email,
+          userInfo.name || `${userInfo.given_name} ${userInfo.family_name}`
+        );
+
+        await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
+        console.log('✅ User created:', user.id);
+      } else {
+        console.log('✅ User found:', user.id);
+        await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
+      }
+
+      req.session.userId = user.id;
+      req.session.authSource = 'zoho';
+      
+      console.log('🎉 === LOGIN SUCCESSFUL ===');
+      
+      res.redirect('/');
+    } catch (error: any) {
+      console.error('❌❌❌ ERROR:', error.message);
+      console.error('Stack:', error.stack);
       res.redirect('/?error=auth_failed');
-    });
+    }
   });
 
   app.post('/api/zoho/sync-employees', isAuthenticated, async (req: any, res) => {

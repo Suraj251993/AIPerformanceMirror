@@ -515,27 +515,33 @@ export function registerZohoRoutes(app: Express) {
     }
   });
 
-  app.get('/auth/zoho/callback', async (req: any, res) => {
-    const fs = await import('fs');
-    const debugLog = (msg: string) => {
-      const timestamp = new Date().toISOString();
-      const logMsg = `[${timestamp}] ${msg}\n`;
-      console.error(msg);
-      console.log(msg);
+  app.get('/auth/zoho/callback', (req: any, res) => {
+    // SYNCHRONOUS log that MUST appear
+    process.stderr.write('🎯🎯🎯 CALLBACK HIT 🎯🎯🎯\n');
+    
+    // Continue with async handling
+    (async () => {
       try {
-        fs.appendFileSync('/tmp/zoho-callback-debug.log', logMsg);
-      } catch (e) {
-        // Ignore file write errors
-      }
-    };
-    
-    debugLog('🎯 === ZOHO CALLBACK STARTED ===');
-    debugLog(`Query params: ${JSON.stringify(req.query)}`);
-    debugLog(`Session exists: ${!!req.session}`);
-    debugLog(`Session oauthState: ${req.session?.oauthState}`);
-    
-    try {
-      const { code, state, error: oauthError } = req.query;
+        const fs = await import('fs');
+        const debugLog = (msg: string) => {
+          const timestamp = new Date().toISOString();
+          const logMsg = `[${timestamp}] ${msg}\n`;
+          console.error(msg);
+          console.log(msg);
+          process.stderr.write(msg + '\n');
+          try {
+            fs.appendFileSync('/tmp/zoho-callback-debug.log', logMsg);
+          } catch (e) {
+            // Ignore file write errors
+          }
+        };
+        
+        debugLog('🎯 === ZOHO CALLBACK STARTED ===');
+        debugLog(`Query params: ${JSON.stringify(req.query)}`);
+        debugLog(`Session exists: ${!!req.session}`);
+        debugLog(`Session oauthState: ${req.session?.oauthState}`);
+        
+        const { code, state, error: oauthError } = req.query;
 
       if (oauthError) {
         console.error('❌ OAuth error from Zoho:', oauthError);
@@ -548,85 +554,91 @@ export function registerZohoRoutes(app: Express) {
       console.log('State param:', stateParam);
       console.log('Code param:', codeParam ? 'exists' : 'missing');
 
-      if (!codeParam || !stateParam) {
-        console.error('❌ Missing code or state parameter');
-        return res.redirect('/?error=missing_parameters');
-      }
-
-      if (!req.session || stateParam !== req.session.oauthState) {
-        console.error('❌ OAuth state mismatch or missing session - potential CSRF attack');
-        console.error('Expected state:', req.session?.oauthState);
-        console.error('Received state:', stateParam);
-        if (req.session) {
-          delete req.session.oauthState;
+        if (!codeParam || !stateParam) {
+          console.error('❌ Missing code or state parameter');
+          return res.redirect('/?error=missing_parameters');
         }
-        return res.redirect('/?error=invalid_state');
-      }
 
-      delete req.session.oauthState;
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err: any) => {
-          if (err) reject(err);
-          else resolve();
+        if (!req.session || stateParam !== req.session.oauthState) {
+          console.error('❌ OAuth state mismatch or missing session - potential CSRF attack');
+          console.error('Expected state:', req.session?.oauthState);
+          console.error('Received state:', stateParam);
+          if (req.session) {
+            delete req.session.oauthState;
+          }
+          return res.redirect('/?error=invalid_state');
+        }
+
+        delete req.session.oauthState;
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err: any) => {
+            if (err) reject(err);
+            else resolve();
+          });
         });
-      });
 
-      const { zohoAuth } = await import('./services/zohoAuth.js');
-      const { zohoSync } = await import('./services/zohoSync.js');
+        const { zohoAuth } = await import('./services/zohoAuth.js');
+        const { zohoSync } = await import('./services/zohoSync.js');
 
-      console.log('🔄 Exchanging authorization code for tokens...');
-      const tokens = await zohoAuth.exchangeCodeForTokens(codeParam);
-      
-      console.log('🔄 Fetching user information from Zoho...');
-      const userInfo = await zohoAuth.getUserInfo(tokens.access_token);
-
-      console.log('🔄 Looking up user by Zoho ID:', userInfo.sub);
-      let user = await storage.getUserByZohoId(userInfo.sub);
-
-      if (!user) {
-        console.log('✨ First-time Zoho login - creating new user...');
-        const tempUserId = crypto.randomBytes(16).toString('hex');
+        console.log('🔄 Exchanging authorization code for tokens...');
+        const tokens = await zohoAuth.exchangeCodeForTokens(codeParam);
         
-        await zohoAuth.storeTokens(tempUserId, tokens, tokens.scope || 'openid,profile,email');
+        console.log('🔄 Fetching user information from Zoho...');
+        const userInfo = await zohoAuth.getUserInfo(tokens.access_token);
+
+        console.log('🔄 Looking up user by Zoho ID:', userInfo.sub);
+        let user = await storage.getUserByZohoId(userInfo.sub);
+
+        if (!user) {
+          console.log('✨ First-time Zoho login - creating new user...');
+          const tempUserId = crypto.randomBytes(16).toString('hex');
+          
+          await zohoAuth.storeTokens(tempUserId, tokens, tokens.scope || 'openid,profile,email');
+          
+          user = await zohoSync.syncUserFromZoho(
+            tempUserId,
+            userInfo.sub,
+            userInfo.email,
+            userInfo.name || `${userInfo.given_name} ${userInfo.family_name}`
+          );
+
+          await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
+          console.log('✅ New user created:', { id: user.id, email: user.email });
+        } else {
+          console.log('✅ Existing user found:', { id: user.id, email: user.email });
+          await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
+        }
+
+        req.session.userId = user.id;
+        req.session.authSource = 'zoho';
         
-        user = await zohoSync.syncUserFromZoho(
-          tempUserId,
-          userInfo.sub,
-          userInfo.email,
-          userInfo.name || `${userInfo.given_name} ${userInfo.family_name}`
-        );
-
-        await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
-        console.log('✅ New user created:', { id: user.id, email: user.email });
-      } else {
-        console.log('✅ Existing user found:', { id: user.id, email: user.email });
-        await zohoAuth.storeTokens(user.id, tokens, tokens.scope || 'openid,profile,email');
-      }
-
-      req.session.userId = user.id;
-      req.session.authSource = 'zoho';
-      
-      console.log('🎉 === ZOHO LOGIN SUCCESSFUL ===');
-      console.log('User ID:', user.id);
-      console.log('User email:', user.email);
-      
-      res.redirect('/');
-    } catch (error: any) {
-      const fs = await import('fs');
-      const errorMsg = `
+        console.log('🎉 === ZOHO LOGIN SUCCESSFUL ===');
+        console.log('User ID:', user.id);
+        console.log('User email:', user.email);
+        
+        res.redirect('/');
+      } catch (error: any) {
+        const fs = await import('fs');
+        const errorMsg = `
 ❌❌❌ ERROR IN ZOHO SSO CALLBACK ❌❌❌
 Error message: ${error.message}
 Error stack: ${error.stack}
 Full error: ${JSON.stringify(error, null, 2)}
 `;
-      console.error(errorMsg);
-      try {
-        fs.appendFileSync('/tmp/zoho-callback-debug.log', `[${new Date().toISOString()}] ${errorMsg}\n`);
-      } catch (e) {
-        // Ignore file write errors
+        console.error(errorMsg);
+        process.stderr.write(errorMsg + '\n');
+        try {
+          fs.appendFileSync('/tmp/zoho-callback-debug.log', `[${new Date().toISOString()}] ${errorMsg}\n`);
+        } catch (e) {
+          // Ignore file write errors
+        }
+        res.redirect('/?error=auth_failed');
       }
+    })().catch(err => {
+      console.error('FATAL ERROR IN CALLBACK:', err);
+      process.stderr.write('FATAL ERROR IN CALLBACK: ' + err.message + '\n');
       res.redirect('/?error=auth_failed');
-    }
+    });
   });
 
   app.post('/api/zoho/sync-employees', isAuthenticated, async (req: any, res) => {

@@ -1,9 +1,10 @@
 import type { Express } from "express";
-import { zohoAuthService } from "./zohoAuth.js";
-import { isAuthenticated } from "./replitAuth.js";
-import { createZohoApiClient } from "./zohoApi.js";
-import { storage } from "./storage.js";
+import { zohoAuth } from "./services/zohoAuth";
+import { storage } from "./storage";
 import crypto from "crypto";
+import { zohoAuthService } from "./zohoAuth";
+import { isAuthenticated } from "./replitAuth";
+import { createZohoApiClient } from "./zohoApi";
 
 const pendingAuths = new Map<string, { userId: string; timestamp: number }>();
 
@@ -17,6 +18,9 @@ setInterval(() => {
 }, 60000);
 
 export function registerZohoRoutes(app: Express) {
+  console.log('🚀🚀🚀 REGISTERING ZOHO ROUTES 🚀🚀🚀');
+  console.error('🚀🚀🚀 REGISTERING ZOHO ROUTES (ERROR LOG) 🚀🚀🚀');
+  
   app.get('/api/zoho/auth-url', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -512,6 +516,8 @@ export function registerZohoRoutes(app: Express) {
   });
 
   app.get('/auth/zoho/callback', async (req: any, res) => {
+    console.error('🎯 === ZOHO CALLBACK STARTED (ERROR LOG) ===');
+    process.stdout.write('🎯 === ZOHO CALLBACK STARTED (STDOUT) ===\n');
     console.log('🎯 === ZOHO CALLBACK STARTED ===');
     console.log('Query params:', req.query);
     console.log('Session exists:', !!req.session);

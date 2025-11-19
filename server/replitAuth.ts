@@ -129,6 +129,17 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // Check for Zoho SSO session first (doesn't use Passport)
+  if (req.session && (req.session as any).userId && (req.session as any).authSource === 'zoho') {
+    return next();
+  }
+
+  // Check for demo mode session
+  if (req.session && (req.session as any).demoRole) {
+    return next();
+  }
+
+  // Fall back to OIDC/Passport authentication
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {

@@ -9,23 +9,28 @@ import { users, feedback as feedbackTable, tasks, projects } from "@shared/schem
 import { eq, desc, inArray, ne, sql } from "drizzle-orm";
 import { registerZohoRoutes } from "./zohoRoutes";
 
-// Helper function to get current user (respecting demo mode)
+// Helper function to get current user (respecting demo mode and Zoho SSO)
 async function getCurrentUser(req: any): Promise<any> {
+  // Check if Zoho SSO session exists
+  if (req.session && req.session.userId && req.session.authSource === 'zoho') {
+    return await storage.getUser(req.session.userId);
+  }
+
   // Check if demo role is set in session (uses real employees)
-  if (req.session.demoRole) {
+  if (req.session && req.session.demoRole) {
     // Map demo role to real employee IDs
     // Meenakshi Dabral for HR_ADMIN and MANAGER
     // Jeeveetha P C K for EMPLOYEE
     const realEmployeeMap: Record<string, string> = {
       'HR_ADMIN': '7e85534a-5efe-4fba-aa13-4067b013692d',  // Meenakshi Dabral
       'MANAGER': '7e85534a-5efe-4fba-aa13-4067b013692d',   // Meenakshi Dabral
-      'EMPLOYEE': '22157a20-f283-4e4b-8f1b-8b886f17fc55',  // Jeeveetha P C K
+      'EMPLOYEE': '22157a20-f283-4e4b-8b886f17fc55',  // Jeeveetha P C K
     };
     const employeeId = realEmployeeMap[req.session.demoRole];
     return await storage.getUser(employeeId);
   }
 
-  // Otherwise return authenticated user
+  // Otherwise return OIDC authenticated user
   if (!req.user || !req.user.claims) {
     return null;
   }

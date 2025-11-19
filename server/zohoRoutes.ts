@@ -506,8 +506,23 @@ export function registerZohoRoutes(app: Express) {
       
       req.session.oauthState = state;
       
+      // CRITICAL: Explicitly save session before redirect
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) {
+            console.error('❌ Failed to save session:', err);
+            reject(err);
+          } else {
+            console.log('✅ Session saved with OAuth state:', state);
+            resolve();
+          }
+        });
+      });
+      
       const { zohoAuth } = await import('./services/zohoAuth');
       const authUrl = zohoAuth.getAuthorizationUrl(state);
+      
+      console.log('🔗 Redirecting to Zoho with state:', state);
       res.redirect(authUrl);
     } catch (error: any) {
       console.error('Error initiating Zoho SSO login:', error);
